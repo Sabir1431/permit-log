@@ -15,7 +15,7 @@
     const { useState, useEffect } = React;
     const e = React.createElement;
 
-    // === IMPORTANT: paste your Apps Script "exec" URL here ===
+    // Paste your Apps Script *exec* URL here
     const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxQaDcmdWmIQHiHXMPabGpLYEefn5jW-T1ZJREOL-N53JXPfiudzCJYTp0fnSjaVjMm/exec';
 
     function PermitLogSystem() {
@@ -51,9 +51,8 @@
         status: 'Active'
       });
 
-      // -------- READ from Google Sheets whenever project changes --------
       useEffect(() => {
-        (async () => { await fetchPermitsFromSheet(project); })();
+        fetchPermitsFromSheet(project);
       }, [project]);
 
       async function fetchPermitsFromSheet(proj) {
@@ -61,34 +60,37 @@
           setLoading(true);
           const url = `${APPS_SCRIPT_URL}?action=list&project=${encodeURIComponent(proj)}`;
           const res = await fetch(url, { method: 'GET' });
-          const json = await res.json();
-          if (!json.ok) throw new Error(json.error || 'Failed to load');
-          // Map rows from sheet headers into the UI model
-          const list = (json.rows || []).map((r, idx) => {
-            return {
-              id: `${Date.now()}_${idx}`,
-              project: proj,
-              permitType: '', // we store only display name from the sheet
-              permitTypeName: (r['Permit Type'] || '').toString(),
-              date: (r['Date'] || '').toString(),
-              time: (r['Time'] || '').toString(),
-              location: (r['Location'] || '').toString(),
-              contractor: (r['Contractor'] || '').toString(),
-              supervisor: (r['Supervisor'] || '').toString(),
-              workDescription: (r['Work Description'] || '').toString(),
-              hazards: (r['Hazards'] || '').toString(),
-              controlMeasures: (r['Control Measure'] || '').toString(),
-              permitIssuer: (r['Permit Issuer'] || '').toString(),
-              validFrom: (r['Valid From'] || '').toString(),
-              validTo: (r['Valid To'] || '').toString(),
-              status: (r['Status'] || '').toString() || 'Active'
-            };
-          });
-          // Most recent at the top if your sheet is chronological
+          // Attempt to parse JSON, but also print raw text if parsing fails
+          const txt = await res.text();
+          let json;
+          try { json = JSON.parse(txt); }
+          catch (parseErr) {
+            console.error('GET response not JSON. Raw text:', txt);
+            throw new Error('Invalid JSON from Apps Script (see console for raw).');
+          }
+          if (!json.ok) throw new Error(json.error || 'Failed to load from Apps Script');
+          const list = (json.rows || []).map((r, idx) => ({
+            id: `${Date.now()}_${idx}`,
+            project: proj,
+            permitType: '',
+            permitTypeName: (r['Permit Type'] || '').toString(),
+            date: (r['Date'] || '').toString(),
+            time: (r['Time'] || '').toString(),
+            location: (r['Location'] || '').toString(),
+            contractor: (r['Contractor'] || '').toString(),
+            supervisor: (r['Supervisor'] || '').toString(),
+            workDescription: (r['Work Description'] || '').toString(),
+            hazards: (r['Hazards'] || '').toString(),
+            controlMeasures: (r['Control Measure'] || '').toString(),
+            permitIssuer: (r['Permit Issuer'] || '').toString(),
+            validFrom: (r['Valid From'] || '').toString(),
+            validTo: (r['Valid To'] || '').toString(),
+            status: (r['Status'] || '').toString() || 'Active'
+          }));
           setPermits(list.reverse());
           setNotification('☁️ Loaded from Google Sheets');
         } catch (err) {
-          console.error(err);
+          console.error('Load error:', err);
           setNotification('⚠️ Could not load from Google Sheets');
         } finally {
           setTimeout(() => setNotification(''), 2500);
@@ -96,14 +98,12 @@
         }
       }
 
-      // -------- WRITE to Google Sheets --------
       async function syncToGoogleSheets(permitData) {
         try {
           setSyncing(true);
-          // application/x-www-form-urlencoded keeps it a "simple" POST (no preflight)
           const payload = new URLSearchParams();
           payload.append('payload', JSON.stringify({
-            project: project,
+            project,
             date: permitData.date,
             time: permitData.time,
             permitTypeName: permitData.permitTypeName,
@@ -124,18 +124,23 @@
             headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
             body: payload.toString()
           });
-          const json = await res.json();
+          const txt = await res.text();
+          let json;
+          try { json = JSON.parse(txt); }
+          catch (parseErr) {
+            console.error('POST response not JSON. Raw text:', txt);
+            throw new Error('Invalid JSON from Apps Script (see console for raw).');
+          }
           if (!json.ok) throw new Error(json.error || 'Apps Script error');
           return true;
         } catch (err) {
-          console.error('Error syncing to Google Sheets:', err);
+          console.error('Save error:', err);
           return false;
         } finally {
           setSyncing(false);
         }
       }
 
-      // -------- Submit handler --------
       async function handleSubmit() {
         if (!permitType || !formData.date || !formData.location || !formData.contractor || !formData.supervisor) {
           setNotification('⚠️ Please fill in all required fields.');
@@ -143,7 +148,6 @@
           return;
         }
         const permitTypeName = permitTypes.find(p => p.id === permitType).name;
-
         const newPermit = {
           id: Date.now(),
           project,
@@ -168,10 +172,9 @@
         const ok = await syncToGoogleSheets(newPermit);
         if (ok) {
           setNotification('✅ Saved to Google Sheets');
-          // Refresh from the authoritative source
           await fetchPermitsFromSheet(project);
         } else {
-          setNotification('❌ Save failed');
+          setNotification('❌ Save failed (see console)');
         }
         setTimeout(() => setNotification(''), 3000);
         setShowForm(false);
@@ -202,7 +205,9 @@
           p.date, p.time, p.permitTypeName, p.location, p.contractor, p.supervisor, p.workDescription,
           p.hazards, p.controlMeasures, p.permitIssuer, p.validFrom, p.validTo, p.status
         ]);
-        const csv = [headers.join(',')].concat(rows.map(r => r.map(x => `"${(x||'').toString().replace(/"/g,'""')}"`).join(','))).join('\n');
+        const csv = [headers.join(',')].concat(
+          rows.map(r => r.map(x => `"${(x||'').toString().replace(/"/g,'""')}"`).join(','))
+        ).join('\n');
         const blob = new Blob([csv], { type: 'text/csv' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -211,7 +216,6 @@
         document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
       }
 
-      // -------- UI --------
       return e('div', { className: 'min-h-screen p-6' },
         e('div', { className: 'max-w-7xl mx-auto' },
           e('div', { className: 'bg-white rounded-lg shadow p-6 mb-6' },
@@ -236,19 +240,16 @@
                     onChange: (ev) => setProject(ev.target.value),
                     className: 'border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
                   },
-                  projects.map(p => e('option', { key: p, value: p }, p))
+                  ['TWS O-16123', 'TW O-16124'].map(p => e('option', { key: p, value: p }, p))
                 )
               ),
               e('div', { className: 'flex-1' }),
+              e('button', { onClick: () => fetchPermitsFromSheet(project), className: 'px-4 py-2 border rounded-lg hover:bg-gray-50' }, loading ? 'Refreshing…' : 'Refresh'),
               e('button', {
-                  onClick: () => fetchPermitsFromSheet(project),
-                  className: 'px-4 py-2 border rounded-lg hover:bg-gray-50'
-                }, loading ? 'Refreshing…' : 'Refresh'),
-              e('button', {
-                  onClick: downloadCSV,
-                  disabled: permits.length === 0,
-                  className: 'bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed'
-                }, '📥 Download CSV')
+                onClick: downloadCSV,
+                disabled: permits.length === 0,
+                className: 'bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed'
+              }, '📥 Download CSV')
             )
           ),
 
