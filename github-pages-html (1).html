@@ -10,393 +10,379 @@
 </head>
 <body>
     <div id="root"></div>
-    
     <script>
-        const { useState, useEffect } = React;
-        const e = React.createElement;
+const { useState, useEffect } = React;
+const e = React.createElement;
 
-        // ⚠️ IMPORTANT: Replace this with your Google Apps Script URL
-        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzIXrLd5Ohi-pjx00g0_lckJUjxkbPBBh3BbillaDVUCrVD5r-IjKEdZ1ezKEjcnuIj/exec';
+const APPS_SCRIPT_URL = 'YOUR_APPS_SCRIPT_URL_HERE';
 
-        function PermitLogSystem() {
-            const [project, setProject] = useState('TWS O-16123');
-            const [permitType, setPermitType] = useState('');
-            const [permits, setPermits] = useState([]);
-            const [showForm, setShowForm] = useState(false);
-            const [notification, setNotification] = useState('');
-            const [loading, setLoading] = useState(false);
+function PermitLogSystem() {
+    const [project, setProject] = useState('TWS O-16123');
+    const [permitType, setPermitType] = useState('');
+    const [permits, setPermits] = useState([]);
+    const [showForm, setShowForm] = useState(false);
+    const [notification, setNotification] = useState('');
 
-            const projects = ['TWS O-16123', 'TW O-16124'];
+    const projects = ['TWS O-16123', 'TW O-16124'];
+    
+    const permitTypes = [
+        { id: 'confined-space', name: 'SOF-3542-I Confined Space Entry', color: 'bg-blue-100 border-blue-300' },
+        { id: 'excavation', name: 'SOF-3542-H Excavation', color: 'bg-green-100 border-green-300' },
+        { id: 'work-height', name: 'SOF-3542-E Work at Height', color: 'bg-yellow-100 border-yellow-300' },
+        { id: 'lifting', name: 'SOF-3542-C Lifting Operation', color: 'bg-purple-100 border-purple-300' }
+    ];
+
+    const [formData, setFormData] = useState({
+        date: new Date().toISOString().split('T')[0],
+        time: new Date().toTimeString().split(' ')[0].substring(0, 5),
+        location: '',
+        contractor: '',
+        supervisor: '',
+        workDescription: '',
+        hazards: '',
+        controlMeasures: '',
+        permitIssuer: '',
+        validFrom: '',
+        validTo: '',
+        status: 'Active'
+    });
+
+    useEffect(() => {
+        loadPermits();
+    }, [project]);
+
+    const loadPermits = () => {
+        const stored = localStorage.getItem('permits_' + project);
+        if (stored) {
+            setPermits(JSON.parse(stored));
+        } else {
+            setPermits([]);
+        }
+    };
+
+    const savePermits = (newPermits) => {
+        localStorage.setItem('permits_' + project, JSON.stringify(newPermits));
+        setPermits(newPermits);
+    };
+
+    const handleSubmit = () => {
+        if (!permitType || !formData.date || !formData.location || !formData.contractor || !formData.supervisor) {
+            setNotification('Please fill in all required fields!');
+            setTimeout(() => setNotification(''), 3000);
+            return;
+        }
+        
+        const permitTypeName = permitTypes.find(p => p.id === permitType).name;
+        
+        const newPermit = {
+            id: Date.now(),
+            project: project,
+            permitType: permitType,
+            permitTypeName: permitTypeName,
+            date: formData.date,
+            time: formData.time,
+            location: formData.location,
+            contractor: formData.contractor,
+            supervisor: formData.supervisor,
+            workDescription: formData.workDescription,
+            hazards: formData.hazards,
+            controlMeasures: formData.controlMeasures,
+            permitIssuer: formData.permitIssuer,
+            validFrom: formData.validFrom,
+            validTo: formData.validTo,
+            status: formData.status,
+            createdAt: new Date().toISOString()
+        };
+
+        const updatedPermits = [newPermit].concat(permits);
+        savePermits(updatedPermits);
+        
+        setNotification('Permit logged successfully!');
+        setTimeout(() => setNotification(''), 3000);
+        
+        setShowForm(false);
+        resetForm();
+    };
+
+    const resetForm = () => {
+        setFormData({
+            date: new Date().toISOString().split('T')[0],
+            time: new Date().toTimeString().split(' ')[0].substring(0, 5),
+            location: '',
+            contractor: '',
+            supervisor: '',
+            workDescription: '',
+            hazards: '',
+            controlMeasures: '',
+            permitIssuer: '',
+            validFrom: '',
+            validTo: '',
+            status: 'Active'
+        });
+        setPermitType('');
+    };
+
+    const downloadCSV = () => {
+        const headers = ['Date', 'Time', 'Permit Type', 'Location', 'Contractor', 'Supervisor', 'Work Description', 'Hazards', 'Control Measures', 'Permit Issuer', 'Valid From', 'Valid To', 'Status'];
+        
+        const rows = permits.map(permit => [
+            permit.date,
+            permit.time,
+            permit.permitTypeName,
+            permit.location,
+            permit.contractor,
+            permit.supervisor,
+            permit.workDescription,
+            permit.hazards,
+            permit.controlMeasures,
+            permit.permitIssuer,
+            permit.validFrom,
+            permit.validTo,
+            permit.status
+        ]);
+
+        const csvContent = [headers.join(',')].concat(
+            rows.map(row => row.map(cell => '"' + (cell || '') + '"').join(','))
+        ).join('\n');
+
+        const blob = new Blob([csvContent], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'Permit_Log_' + project + '_' + new Date().toISOString().split('T')[0] + '.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        
+        setNotification('Log downloaded successfully!');
+        setTimeout(() => setNotification(''), 3000);
+    };
+
+    return e('div', { className: 'min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6' },
+        e('div', { className: 'max-w-7xl mx-auto' },
+            e('div', { className: 'bg-white rounded-lg shadow-lg p-6 mb-6' },
+                e('div', { className: 'flex items-center justify-between mb-4 flex-wrap gap-4' },
+                    e('h1', { className: 'text-2xl md:text-3xl font-bold text-gray-800' }, 'Construction Permit Log System'),
+                    e('button', {
+                        onClick: () => setShowForm(!showForm),
+                        className: 'bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition'
+                    }, showForm ? 'Cancel' : '+ New Permit')
+                ),
+                e('div', { className: 'flex gap-4 items-center flex-wrap' },
+                    e('div', null,
+                        e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Project'),
+                        e('select', {
+                            value: project,
+                            onChange: (ev) => setProject(ev.target.value),
+                            className: 'border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
+                        },
+                            projects.map(proj => e('option', { key: proj, value: proj }, proj))
+                        )
+                    ),
+                    e('div', { className: 'flex-1' }),
+                    e('button', {
+                        onClick: downloadCSV,
+                        disabled: permits.length === 0,
+                        className: 'bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:bg-gray-400 disabled:cursor-not-allowed'
+                    }, 'Download CSV')
+                )
+            ),
             
-            const permitTypes = [
-                { id: 'confined-space', name: 'SOF-3542-I Confined Space Entry', color: 'bg-blue-100 border-blue-300' },
-                { id: 'excavation', name: 'SOF-3542-H Excavation', color: 'bg-green-100 border-green-300' },
-                { id: 'work-height', name: 'SOF-3542-E Work at Height', color: 'bg-yellow-100 border-yellow-300' },
-                { id: 'lifting', name: 'SOF-3542-C Lifting Operation', color: 'bg-purple-100 border-purple-300' }
-            ];
+            notification && e('div', {
+                className: notification.includes('successfully') ? 
+                    'bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg mb-6' :
+                    'bg-orange-100 border border-orange-400 text-orange-700 px-4 py-3 rounded-lg mb-6'
+            }, notification),
 
-            const [formData, setFormData] = useState({
-                date: new Date().toISOString().split('T')[0],
-                time: new Date().toTimeString().split(' ')[0].substring(0, 5),
-                location: '',
-                contractor: '',
-                supervisor: '',
-                workDescription: '',
-                hazards: '',
-                controlMeasures: '',
-                permitIssuer: '',
-                validFrom: '',
-                validTo: '',
-                status: 'Active'
-            });
-
-            useEffect(() => {
-                loadPermits();
-            }, [project]);
-
-            const loadPermits = () => {
-                const stored = localStorage.getItem(`permits_${project}`);
-                if (stored) {
-                    setPermits(JSON.parse(stored));
-                } else {
-                    setPermits([]);
-                }
-            };
-
-            const savePermits = (newPermits) => {
-                localStorage.setItem(`permits_${project}`, JSON.stringify(newPermits));
-                setPermits(newPermits);
-            };
-
-            const handleSubmit = () => {
-                if (!permitType || !formData.date || !formData.location || !formData.contractor || !formData.supervisor) {
-                    setNotification('⚠️ Please fill in all required fields!');
-                    setTimeout(() => setNotification(''), 3000);
-                    return;
-                }
-                
-                const permitTypeName = permitTypes.find(p => p.id === permitType)?.name;
-                
-                const newPermit = {
-                    id: Date.now(),
-                    project,
-                    permitType,
-                    permitTypeName,
-                    ...formData,
-                    createdAt: new Date().toISOString()
-                };
-
-                const updatedPermits = [newPermit, ...permits];
-                savePermits(updatedPermits);
-                
-                setNotification('✓ Permit logged successfully!');
-                setTimeout(() => setNotification(''), 3000);
-                
-                setShowForm(false);
-                resetForm();
-            };
-
-            const resetForm = () => {
-                setFormData({
-                    date: new Date().toISOString().split('T')[0],
-                    time: new Date().toTimeString().split(' ')[0].substring(0, 5),
-                    location: '',
-                    contractor: '',
-                    supervisor: '',
-                    workDescription: '',
-                    hazards: '',
-                    controlMeasures: '',
-                    permitIssuer: '',
-                    validFrom: '',
-                    validTo: '',
-                    status: 'Active'
-                });
-                setPermitType('');
-            };
-
-            const downloadCSV = () => {
-                const headers = ['Date', 'Time', 'Permit Type', 'Location', 'Contractor', 'Supervisor', 'Work Description', 'Hazards', 'Control Measures', 'Permit Issuer', 'Valid From', 'Valid To', 'Status'];
-                
-                const rows = permits.map(permit => [
-                    permit.date,
-                    permit.time,
-                    permit.permitTypeName,
-                    permit.location,
-                    permit.contractor,
-                    permit.supervisor,
-                    permit.workDescription,
-                    permit.hazards,
-                    permit.controlMeasures,
-                    permit.permitIssuer,
-                    permit.validFrom,
-                    permit.validTo,
-                    permit.status
-                ]);
-
-                const csvContent = [
-                    headers.join(','),
-                    ...rows.map(row => row.map(cell => `"${cell || ''}"`).join(','))
-                ].join('\n');
-
-                const blob = new Blob([csvContent], { type: 'text/csv' });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `Permit_Log_${project}_${new Date().toISOString().split('T')[0]}.csv`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                window.URL.revokeObjectURL(url);
-                
-                setNotification('✓ Log downloaded successfully!');
-                setTimeout(() => setNotification(''), 3000);
-            };
-
-            return e('div', { className: 'min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6' },
-                e('div', { className: 'max-w-7xl mx-auto' },
-                    // Header
-                    e('div', { className: 'bg-white rounded-lg shadow-lg p-6 mb-6' },
-                        e('div', { className: 'flex items-center justify-between mb-4' },
-                            e('h1', { className: 'text-3xl font-bold text-gray-800' }, '🏗️ Construction Permit Log System'),
-                            e('button', {
-                                onClick: () => setShowForm(!showForm),
-                                className: 'bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition'
-                            }, '➕ New Permit')
-                        ),
-                        e('div', { className: 'flex gap-4 items-center' },
-                            e('div', null,
-                                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Project'),
-                                e('select', {
-                                    value: project,
-                                    onChange: (ev) => setProject(ev.target.value),
-                                    className: 'border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
-                                },
-                                    projects.map(proj =>
-                                        e('option', { key: proj, value: proj }, proj)
-                                    )
-                                )
-                            ),
-                            e('div', { className: 'flex-1' }),
-                            e('button', {
-                                onClick: downloadCSV,
-                                disabled: permits.length === 0,
-                                className: 'bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition disabled:bg-gray-400'
-                            }, '📥 Download CSV')
+            showForm && e('div', { className: 'bg-white rounded-lg shadow-lg p-6 mb-6' },
+                e('h2', { className: 'text-xl font-bold text-gray-800 mb-4' }, 'New Permit Entry'),
+                e('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-4 mb-4' },
+                    e('div', null,
+                        e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Permit Type *'),
+                        e('select', {
+                            value: permitType,
+                            onChange: (ev) => setPermitType(ev.target.value),
+                            className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
+                        },
+                            e('option', { value: '' }, 'Select Permit Type'),
+                            permitTypes.map(type => e('option', { key: type.id, value: type.id }, type.name))
                         )
                     ),
-                    
-                    // Notification
-                    notification && e('div', {
-                        className: `${notification.includes('✓') ? 'bg-green-100 border-green-400 text-green-700' : 'bg-orange-100 border-orange-400 text-orange-700'} border px-4 py-3 rounded-lg mb-6`
-                    }, notification),
-
-                    // Form
-                    showForm && e('div', { className: 'bg-white rounded-lg shadow-lg p-6 mb-6' },
-                        e('h2', { className: 'text-2xl font-bold text-gray-800 mb-4' }, 'New Permit Entry'),
-                        e('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-4 mb-4' },
-                            // Permit Type
-                            e('div', null,
-                                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Permit Type *'),
-                                e('select', {
-                                    value: permitType,
-                                    onChange: (ev) => setPermitType(ev.target.value),
-                                    className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
-                                },
-                                    e('option', { value: '' }, 'Select Permit Type'),
-                                    permitTypes.map(type =>
-                                        e('option', { key: type.id, value: type.id }, type.name)
-                                    )
-                                )
-                            ),
-                            // Date
-                            e('div', null,
-                                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Date *'),
-                                e('input', {
-                                    type: 'date',
-                                    value: formData.date,
-                                    onChange: (ev) => setFormData({...formData, date: ev.target.value}),
-                                    className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
-                                })
-                            ),
-                            // Time
-                            e('div', null,
-                                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Time *'),
-                                e('input', {
-                                    type: 'time',
-                                    value: formData.time,
-                                    onChange: (ev) => setFormData({...formData, time: ev.target.value}),
-                                    className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
-                                })
-                            ),
-                            // Location
-                            e('div', null,
-                                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Location *'),
-                                e('input', {
-                                    type: 'text',
-                                    value: formData.location,
-                                    onChange: (ev) => setFormData({...formData, location: ev.target.value}),
-                                    placeholder: 'Site location',
-                                    className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
-                                })
-                            ),
-                            // Contractor
-                            e('div', null,
-                                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Contractor *'),
-                                e('input', {
-                                    type: 'text',
-                                    value: formData.contractor,
-                                    onChange: (ev) => setFormData({...formData, contractor: ev.target.value}),
-                                    placeholder: 'Contractor name',
-                                    className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
-                                })
-                            ),
-                            // Supervisor
-                            e('div', null,
-                                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Supervisor *'),
-                                e('input', {
-                                    type: 'text',
-                                    value: formData.supervisor,
-                                    onChange: (ev) => setFormData({...formData, supervisor: ev.target.value}),
-                                    placeholder: 'Supervisor name',
-                                    className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
-                                })
-                            ),
-                            // Work Description
-                            e('div', { className: 'md:col-span-2' },
-                                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Work Description'),
-                                e('textarea', {
-                                    value: formData.workDescription,
-                                    onChange: (ev) => setFormData({...formData, workDescription: ev.target.value}),
-                                    placeholder: 'Describe the work',
-                                    rows: 2,
-                                    className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
-                                })
-                            ),
-                            // Hazards
-                            e('div', { className: 'md:col-span-2' },
-                                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Hazards'),
-                                e('textarea', {
-                                    value: formData.hazards,
-                                    onChange: (ev) => setFormData({...formData, hazards: ev.target.value}),
-                                    placeholder: 'List hazards',
-                                    rows: 2,
-                                    className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
-                                })
-                            ),
-                            // Control Measures
-                            e('div', { className: 'md:col-span-2' },
-                                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Control Measures'),
-                                e('textarea', {
-                                    value: formData.controlMeasures,
-                                    onChange: (ev) => setFormData({...formData, controlMeasures: ev.target.value}),
-                                    placeholder: 'Safety measures',
-                                    rows: 2,
-                                    className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
-                                })
-                            ),
-                            // Permit Issuer
-                            e('div', null,
-                                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Permit Issuer'),
-                                e('input', {
-                                    type: 'text',
-                                    value: formData.permitIssuer,
-                                    onChange: (ev) => setFormData({...formData, permitIssuer: ev.target.value}),
-                                    placeholder: 'Issuer name',
-                                    className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
-                                })
-                            ),
-                            // Status
-                            e('div', null,
-                                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Status'),
-                                e('select', {
-                                    value: formData.status,
-                                    onChange: (ev) => setFormData({...formData, status: ev.target.value}),
-                                    className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
-                                },
-                                    e('option', { value: 'Active' }, 'Active'),
-                                    e('option', { value: 'Closed' }, 'Closed'),
-                                    e('option', { value: 'Suspended' }, 'Suspended')
-                                )
-                            )
-                        ),
-                        e('div', { className: 'flex gap-3 justify-end' },
-                            e('button', {
-                                onClick: () => { setShowForm(false); resetForm(); },
-                                className: 'px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition'
-                            }, 'Cancel'),
-                            e('button', {
-                                onClick: handleSubmit,
-                                className: 'px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition'
-                            }, 'Save Permit')
-                        )
-                    ),
-
-                    // Statistics
-                    e('div', { className: 'grid grid-cols-1 md:grid-cols-4 gap-4 mb-6' },
-                        permitTypes.map(type => {
-                            const count = permits.filter(p => p.permitType === type.id).length;
-                            return e('div', {
-                                key: type.id,
-                                className: `${type.color} border-2 rounded-lg p-4`
-                            },
-                                e('div', { className: 'text-2xl font-bold text-gray-800' }, count),
-                                e('div', { className: 'text-sm text-gray-600' }, type.name.split(' ').slice(1).join(' '))
-                            );
+                    e('div', null,
+                        e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Date *'),
+                        e('input', {
+                            type: 'date',
+                            value: formData.date,
+                            onChange: (ev) => setFormData(Object.assign({}, formData, { date: ev.target.value })),
+                            className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
                         })
                     ),
+                    e('div', null,
+                        e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Time *'),
+                        e('input', {
+                            type: 'time',
+                            value: formData.time,
+                            onChange: (ev) => setFormData(Object.assign({}, formData, { time: ev.target.value })),
+                            className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
+                        })
+                    ),
+                    e('div', null,
+                        e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Location *'),
+                        e('input', {
+                            type: 'text',
+                            value: formData.location,
+                            onChange: (ev) => setFormData(Object.assign({}, formData, { location: ev.target.value })),
+                            placeholder: 'Site location',
+                            className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
+                        })
+                    ),
+                    e('div', null,
+                        e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Contractor *'),
+                        e('input', {
+                            type: 'text',
+                            value: formData.contractor,
+                            onChange: (ev) => setFormData(Object.assign({}, formData, { contractor: ev.target.value })),
+                            placeholder: 'Contractor name',
+                            className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
+                        })
+                    ),
+                    e('div', null,
+                        e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Supervisor *'),
+                        e('input', {
+                            type: 'text',
+                            value: formData.supervisor,
+                            onChange: (ev) => setFormData(Object.assign({}, formData, { supervisor: ev.target.value })),
+                            placeholder: 'Supervisor name',
+                            className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
+                        })
+                    ),
+                    e('div', { className: 'md:col-span-2' },
+                        e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Work Description'),
+                        e('textarea', {
+                            value: formData.workDescription,
+                            onChange: (ev) => setFormData(Object.assign({}, formData, { workDescription: ev.target.value })),
+                            placeholder: 'Describe the work',
+                            rows: 2,
+                            className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
+                        })
+                    ),
+                    e('div', { className: 'md:col-span-2' },
+                        e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Hazards'),
+                        e('textarea', {
+                            value: formData.hazards,
+                            onChange: (ev) => setFormData(Object.assign({}, formData, { hazards: ev.target.value })),
+                            placeholder: 'List hazards',
+                            rows: 2,
+                            className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
+                        })
+                    ),
+                    e('div', { className: 'md:col-span-2' },
+                        e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Control Measures'),
+                        e('textarea', {
+                            value: formData.controlMeasures,
+                            onChange: (ev) => setFormData(Object.assign({}, formData, { controlMeasures: ev.target.value })),
+                            placeholder: 'Safety measures',
+                            rows: 2,
+                            className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
+                        })
+                    ),
+                    e('div', null,
+                        e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Permit Issuer'),
+                        e('input', {
+                            type: 'text',
+                            value: formData.permitIssuer,
+                            onChange: (ev) => setFormData(Object.assign({}, formData, { permitIssuer: ev.target.value })),
+                            placeholder: 'Issuer name',
+                            className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
+                        })
+                    ),
+                    e('div', null,
+                        e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Status'),
+                        e('select', {
+                            value: formData.status,
+                            onChange: (ev) => setFormData(Object.assign({}, formData, { status: ev.target.value })),
+                            className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
+                        },
+                            e('option', { value: 'Active' }, 'Active'),
+                            e('option', { value: 'Closed' }, 'Closed'),
+                            e('option', { value: 'Suspended' }, 'Suspended')
+                        )
+                    )
+                ),
+                e('div', { className: 'flex gap-3 justify-end' },
+                    e('button', {
+                        onClick: () => { setShowForm(false); resetForm(); },
+                        className: 'px-6 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition'
+                    }, 'Cancel'),
+                    e('button', {
+                        onClick: handleSubmit,
+                        className: 'px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition'
+                    }, 'Save Permit')
+                )
+            ),
 
-                    // Permit Log
-                    e('div', { className: 'bg-white rounded-lg shadow-lg p-6' },
-                        e('h2', { className: 'text-2xl font-bold text-gray-800 mb-4' }, `📋 Permit Log - ${project}`),
-                        permits.length === 0 ?
-                            e('div', { className: 'text-center py-12 text-gray-500' },
-                                e('p', null, 'No permits logged yet. Click "New Permit" to get started.')
-                            ) :
-                            e('div', { className: 'overflow-x-auto' },
-                                e('table', { className: 'w-full' },
-                                    e('thead', { className: 'bg-gray-50' },
-                                        e('tr', null,
-                                            e('th', { className: 'px-4 py-3 text-left text-sm font-semibold text-gray-700' }, 'Date'),
-                                            e('th', { className: 'px-4 py-3 text-left text-sm font-semibold text-gray-700' }, 'Time'),
-                                            e('th', { className: 'px-4 py-3 text-left text-sm font-semibold text-gray-700' }, 'Permit Type'),
-                                            e('th', { className: 'px-4 py-3 text-left text-sm font-semibold text-gray-700' }, 'Location'),
-                                            e('th', { className: 'px-4 py-3 text-left text-sm font-semibold text-gray-700' }, 'Contractor'),
-                                            e('th', { className: 'px-4 py-3 text-left text-sm font-semibold text-gray-700' }, 'Supervisor'),
-                                            e('th', { className: 'px-4 py-3 text-left text-sm font-semibold text-gray-700' }, 'Status')
-                                        )
-                                    ),
-                                    e('tbody', { className: 'divide-y divide-gray-200' },
-                                        permits.map(permit =>
-                                            e('tr', { key: permit.id, className: 'hover:bg-gray-50' },
-                                                e('td', { className: 'px-4 py-3 text-sm text-gray-800' }, permit.date),
-                                                e('td', { className: 'px-4 py-3 text-sm text-gray-800' }, permit.time),
-                                                e('td', { className: 'px-4 py-3 text-sm' },
-                                                    e('span', { className: 'inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs' },
-                                                        permit.permitTypeName
-                                                    )
-                                                ),
-                                                e('td', { className: 'px-4 py-3 text-sm text-gray-800' }, permit.location),
-                                                e('td', { className: 'px-4 py-3 text-sm text-gray-800' }, permit.contractor),
-                                                e('td', { className: 'px-4 py-3 text-sm text-gray-800' }, permit.supervisor),
-                                                e('td', { className: 'px-4 py-3 text-sm' },
-                                                    e('span', { 
-                                                        className: `font-semibold ${permit.status === 'Active' ? 'text-green-600' : 'text-gray-500'}`
-                                                    }, permit.status)
-                                                )
+            e('div', { className: 'grid grid-cols-1 md:grid-cols-4 gap-4 mb-6' },
+                permitTypes.map(type => {
+                    const count = permits.filter(p => p.permitType === type.id).length;
+                    return e('div', {
+                        key: type.id,
+                        className: type.color + ' border-2 rounded-lg p-4'
+                    },
+                        e('div', { className: 'text-2xl font-bold text-gray-800' }, count),
+                        e('div', { className: 'text-sm text-gray-600' }, type.name.split(' ').slice(1).join(' '))
+                    );
+                })
+            ),
+
+            e('div', { className: 'bg-white rounded-lg shadow-lg p-6' },
+                e('h2', { className: 'text-xl font-bold text-gray-800 mb-4' }, 'Permit Log - ' + project),
+                permits.length === 0 ?
+                    e('div', { className: 'text-center py-12 text-gray-500' },
+                        e('p', null, 'No permits logged yet. Click "New Permit" to get started.')
+                    ) :
+                    e('div', { className: 'overflow-x-auto' },
+                        e('table', { className: 'w-full' },
+                            e('thead', { className: 'bg-gray-50' },
+                                e('tr', null,
+                                    e('th', { className: 'px-4 py-3 text-left text-sm font-semibold text-gray-700' }, 'Date'),
+                                    e('th', { className: 'px-4 py-3 text-left text-sm font-semibold text-gray-700' }, 'Time'),
+                                    e('th', { className: 'px-4 py-3 text-left text-sm font-semibold text-gray-700' }, 'Permit Type'),
+                                    e('th', { className: 'px-4 py-3 text-left text-sm font-semibold text-gray-700' }, 'Location'),
+                                    e('th', { className: 'px-4 py-3 text-left text-sm font-semibold text-gray-700' }, 'Contractor'),
+                                    e('th', { className: 'px-4 py-3 text-left text-sm font-semibold text-gray-700' }, 'Supervisor'),
+                                    e('th', { className: 'px-4 py-3 text-left text-sm font-semibold text-gray-700' }, 'Status')
+                                )
+                            ),
+                            e('tbody', { className: 'divide-y divide-gray-200' },
+                                permits.map(permit =>
+                                    e('tr', { key: permit.id, className: 'hover:bg-gray-50' },
+                                        e('td', { className: 'px-4 py-3 text-sm text-gray-800' }, permit.date),
+                                        e('td', { className: 'px-4 py-3 text-sm text-gray-800' }, permit.time),
+                                        e('td', { className: 'px-4 py-3 text-sm' },
+                                            e('span', { className: 'inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs' },
+                                                permit.permitTypeName
                                             )
+                                        ),
+                                        e('td', { className: 'px-4 py-3 text-sm text-gray-800' }, permit.location),
+                                        e('td', { className: 'px-4 py-3 text-sm text-gray-800' }, permit.contractor),
+                                        e('td', { className: 'px-4 py-3 text-sm text-gray-800' }, permit.supervisor),
+                                        e('td', { className: 'px-4 py-3 text-sm' },
+                                            e('span', { 
+                                                className: permit.status === 'Active' ? 'font-semibold text-green-600' : 'font-semibold text-gray-500'
+                                            }, permit.status)
                                         )
                                     )
                                 )
                             )
+                        )
                     )
-                )
-            );
-        }
+            )
+        )
+    );
+}
 
-        ReactDOM.render(
-            e(PermitLogSystem),
-            document.getElementById('root')
-        );
+ReactDOM.render(e(PermitLogSystem), document.getElementById('root'));
     </script>
 </body>
 </html>
