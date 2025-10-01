@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>TAQA WS Contracts O-16123 & O-16124 Permit Log System</title>
+  <title>Construction Permit Log System</title>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -15,7 +15,7 @@
     const { useState, useEffect, useMemo, useRef } = React;
     const e = React.createElement;
 
-    // Use the SAME URL that returned ok:true in your GET test
+    /* Use the SAME Apps Script URL that returned ok:true */
     const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxQaDcmdWmIQHiHXMPabGpLYEefn5jW-T1ZJREOL-N53JXPfiudzCJYTp0fnSjaVjMm/exec';
 
     function PermitLogSystem() {
@@ -41,6 +41,7 @@
       const [formData, setFormData] = useState({
         date: new Date().toISOString().split('T')[0],
         time: new Date().toTimeString().split(' ')[0].substring(0, 5),
+        permitNo: '',              // NEW
         location: '',
         contractor: '',
         supervisor: '',
@@ -53,7 +54,6 @@
         status: 'Active'
       });
 
-      // Which fields are required
       const required = useMemo(() => ({
         permitType: 'Permit Type',
         date: 'Date',
@@ -61,6 +61,7 @@
         location: 'Location',
         contractor: 'Contractor',
         supervisor: 'Supervisor'
+        // permitNo is intentionally OPTIONAL; tell me if you want it required
       }), []);
 
       useEffect(() => { fetchPermitsFromSheet(project); }, [project]);
@@ -75,6 +76,8 @@
           try { json = JSON.parse(txt); }
           catch { throw new Error('Invalid JSON from Apps Script: ' + txt); }
           if (!json.ok) throw new Error(json.error || 'Failed to load');
+
+          // Map rows → local objects; includes new "Permit No" column
           const list = (json.rows || []).map((r, idx) => ({
             id: `${Date.now()}_${idx}`,
             project: proj,
@@ -82,12 +85,13 @@
             permitTypeName: (r['Permit Type'] || '').toString(),
             date: (r['Date'] || '').toString(),
             time: (r['Time'] || '').toString(),
+            permitNo: (r['Permit No.'] || r['Permit No'] || '').toString(),
             location: (r['Location'] || '').toString(),
             contractor: (r['Contractor'] || '').toString(),
             supervisor: (r['Supervisor'] || '').toString(),
             workDescription: (r['Work Description'] || '').toString(),
             hazards: (r['Hazards'] || '').toString(),
-            controlMeasures: (r['Control Measure'] || '').toString(),
+            controlMeasures: (r['Control Measures'] || r['Control Measure'] || '').toString(),
             permitIssuer: (r['Permit Issuer'] || '').toString(),
             validFrom: (r['Valid From'] || '').toString(),
             validTo: (r['Valid To'] || '').toString(),
@@ -112,6 +116,7 @@
             project,
             date: permitData.date,
             time: permitData.time,
+            permitNo: permitData.permitNo,             // NEW
             permitTypeName: permitData.permitTypeName,
             location: permitData.location,
             contractor: permitData.contractor,
@@ -157,7 +162,6 @@
           }
         }
         setErrors(errs);
-        // focus/scroll to first error
         if (Object.keys(errs).length) {
           const el = firstErrorRef.current;
           if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -178,6 +182,7 @@
           permitTypeName,
           date: formData.date,
           time: formData.time,
+          permitNo: formData.permitNo,           // NEW
           location: formData.location,
           contractor: formData.contractor,
           supervisor: formData.supervisor,
@@ -193,7 +198,6 @@
 
         setNotification('💾 Saving to Google Sheets…');
         const ok = await syncToGoogleSheets(newPermit);
-
         if (ok) {
           setNotification('✅ Saved to Google Sheets');
           await fetchPermitsFromSheet(project);
@@ -207,6 +211,7 @@
         setFormData({
           date: new Date().toISOString().split('T')[0],
           time: new Date().toTimeString().split(' ')[0].substring(0, 5),
+          permitNo: '',
           location: '',
           contractor: '',
           supervisor: '',
@@ -222,9 +227,9 @@
       }
 
       function downloadCSV() {
-        const headers = ['Date','Time','Permit Type','Location','Contractor','Supervisor','Work Description','Hazards','Control Measure','Permit Issuer','Valid From','Valid To','Status'];
+        const headers = ['Date','Time','Permit No.','Permit Type','Location','Contractor','Supervisor','Work Description','Hazards','Control Measures','Permit Issuer','Valid From','Valid To','Status'];
         const rows = permits.map(p => [
-          p.date, p.time, p.permitTypeName, p.location, p.contractor, p.supervisor, p.workDescription,
+          p.date, p.time, p.permitNo, p.permitTypeName, p.location, p.contractor, p.supervisor, p.workDescription,
           p.hazards, p.controlMeasures, p.permitIssuer, p.validFrom, p.validTo, p.status
         ]);
         const csv = [headers.join(',')].concat(
@@ -237,8 +242,6 @@
         a.download = `Permit_Log_${project}_${new Date().toISOString().split('T')[0]}.csv`;
         document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
       }
-
-      const isInvalid = Object.keys(errors).length > 0;
 
       const inputClass = (name) =>
         'w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none ' +
@@ -254,7 +257,7 @@
           e('div', { className: 'bg-white rounded-lg shadow p-6 mb-6' },
             e('div', { className: 'flex items-center justify-between gap-4 flex-wrap' },
               e('div', null,
-                e('h1', { className: 'text-2xl md:text-3xl font-bold text-gray-800' }, 'TAQA WS Contracts O-16123 & O-16124 Permit Log System'),
+                e('h1', { className: 'text-2xl md:text-3xl font-bold text-gray-800' }, 'Construction Permit Log System'),
                 e('p', { className: 'text-xs text-green-600 mt-1' }, '☁️ Connected to Google Sheets')
               ),
               e('div', { className: 'flex items-center gap-2' },
@@ -267,7 +270,7 @@
             ),
             e('div', { className: 'flex gap-4 items-end flex-wrap mt-4' },
               e('div', null,
-                label('Project', null),
+                label('Project'),
                 e('select', {
                     value: project,
                     onChange: (ev) => setProject(ev.target.value),
@@ -324,6 +327,13 @@
                   className: inputClass('time') })
               ),
 
+              e('div', null,
+                label('Permit No.'),
+                e('input', { type: 'text', value: formData.permitNo, placeholder: 'e.g., CSE-0007',
+                  onChange: (ev) => setFormData({ ...formData, permitNo: ev.target.value }),
+                  className: inputClass('permitNo') })
+              ),
+
               e('div', { ref: el => { if (errors.location) firstErrorRef.current = el; } },
                 label('Location *', 'location'),
                 e('input', { type: 'text', value: formData.location, placeholder: 'Site location',
@@ -346,7 +356,7 @@
               ),
 
               e('div', { className: 'md:col-span-2' },
-                label('Work Description', null),
+                label('Work Description'),
                 e('textarea', {
                   value: formData.workDescription, rows: 2, placeholder: 'Describe the work',
                   onChange: (ev) => setFormData({ ...formData, workDescription: ev.target.value }),
@@ -354,7 +364,7 @@
                 })
               ),
               e('div', { className: 'md:col-span-2' },
-                label('Hazards', null),
+                label('Hazards'),
                 e('textarea', {
                   value: formData.hazards, rows: 2, placeholder: 'List hazards',
                   onChange: (ev) => setFormData({ ...formData, hazards: ev.target.value }),
@@ -362,7 +372,7 @@
                 })
               ),
               e('div', { className: 'md:col-span-2' },
-                label('Control Measures', null),
+                label('Control Measures'),
                 e('textarea', {
                   value: formData.controlMeasures, rows: 2, placeholder: 'Safety measures',
                   onChange: (ev) => setFormData({ ...formData, controlMeasures: ev.target.value }),
@@ -370,13 +380,13 @@
                 })
               ),
               e('div', null,
-                label('Permit Issuer', null),
+                label('Permit Issuer'),
                 e('input', { type: 'text', value: formData.permitIssuer, placeholder: 'Issuer name',
                   onChange: (ev) => setFormData({ ...formData, permitIssuer: ev.target.value }),
                   className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none' })
               ),
               e('div', null,
-                label('Status', null),
+                label('Status'),
                 e('select', {
                     value: formData.status,
                     onChange: (ev) => setFormData({ ...formData, status: ev.target.value }),
@@ -388,13 +398,13 @@
                 )
               ),
               e('div', null,
-                label('Valid From', null),
+                label('Valid From'),
                 e('input', { type: 'datetime-local', value: formData.validFrom,
                   onChange: (ev) => setFormData({ ...formData, validFrom: ev.target.value }),
                   className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none' })
               ),
               e('div', null,
-                label('Valid To', null),
+                label('Valid To'),
                 e('input', { type: 'datetime-local', value: formData.validTo,
                   onChange: (ev) => setFormData({ ...formData, validTo: ev.target.value }),
                   className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none' })
@@ -414,16 +424,6 @@
             )
           ),
 
-          e('div', { className: 'grid grid-cols-1 md:grid-cols-4 gap-4 mb-6' },
-            permitTypes.map(type => {
-              const count = permits.filter(p => (p.permitTypeName || '').includes(type.name.split(' ').slice(1).join(' '))).length;
-              return e('div', { key: type.id, className: type.color + ' border-2 rounded-lg p-4' },
-                e('div', { className: 'text-2xl font-bold text-gray-800' }, count),
-                e('div', { className: 'text-sm text-gray-600' }, type.name.split(' ').slice(1).join(' '))
-              );
-            })
-          ),
-
           e('div', { className: 'bg-white rounded-lg shadow p-6' },
             e('h2', { className: 'text-xl font-bold text-gray-800 mb-4' }, `Permit Log - ${project}`),
             permits.length === 0
@@ -432,7 +432,7 @@
                   e('table', { className: 'w-full' },
                     e('thead', { className: 'bg-gray-50' },
                       e('tr', null,
-                        ['Date','Time','Permit Type','Location','Contractor','Supervisor','Status']
+                        ['Date','Time','Permit No.','Permit Type','Location','Contractor','Supervisor','Status']
                           .map(h => e('th', { key: h, className: 'px-4 py-3 text-left text-sm font-semibold text-gray-700' }, h))
                       )
                     ),
@@ -441,6 +441,7 @@
                         e('tr', { key: p.id, className: 'hover:bg-gray-50' },
                           e('td', { className: 'px-4 py-3 text-sm text-gray-800' }, p.date),
                           e('td', { className: 'px-4 py-3 text-sm text-gray-800' }, p.time),
+                          e('td', { className: 'px-4 py-3 text-sm text-gray-800' }, p.permitNo || ''),
                           e('td', { className: 'px-4 py-3 text-sm' },
                             e('span', { className: 'inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs' }, p.permitTypeName)
                           ),
