@@ -66,43 +66,41 @@ function PermitLogSystem() {
         setPermits(newPermits);
     };
 
-    const syncToGoogleSheets = async (permitData) => {
-        try {
-            setSyncing(true);
-            
-            // Send data to Google Sheets
-            const response = await fetch(APPS_SCRIPT_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    project: project,
-                    date: permitData.date,
-                    time: permitData.time,
-                    permitTypeName: permitData.permitTypeName,
-                    location: permitData.location,
-                    contractor: permitData.contractor,
-                    supervisor: permitData.supervisor,
-                    workDescription: permitData.workDescription,
-                    hazards: permitData.hazards,
-                    controlMeasures: permitData.controlMeasures,
-                    permitIssuer: permitData.permitIssuer,
-                    validFrom: permitData.validFrom,
-                    validTo: permitData.validTo,
-                    status: permitData.status
-                })
-            });
-            
-            setSyncing(false);
-            return true;
-        } catch (error) {
-            console.error('Error syncing to Google Sheets:', error);
-            setSyncing(false);
-            return false;
-        }
-    };
+   const syncToGoogleSheets = async (permitData) => {
+    try {
+        setSyncing(true);
+        
+        const response = await fetch(APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                project: project,
+                date: permitData.date,
+                time: permitData.time,
+                permitTypeName: permitData.permitTypeName,
+                location: permitData.location,
+                contractor: permitData.contractor,
+                supervisor: permitData.supervisor,
+                workDescription: permitData.workDescription,
+                hazards: permitData.hazards,
+                controlMeasures: permitData.controlMeasures,
+                permitIssuer: permitData.permitIssuer,
+                validFrom: permitData.validFrom,
+                validTo: permitData.validTo,
+                status: permitData.status
+            })
+        });
+        
+        setSyncing(false);
+        return true;
+    } catch (error) {
+        console.error('Error syncing to Google Sheets:', error);
+        setSyncing(false);
+        return false;
+    }
+};
 
     const handleSubmit = async () => {
         if (!permitType || !formData.date || !formData.location || !formData.contractor || !formData.supervisor) {
