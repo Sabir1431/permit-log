@@ -98,88 +98,43 @@
         }
       }
 
-      async function syncToGoogleSheets(permitData) {
-        try {
-          setSyncing(true);
-          const payload = new URLSearchParams();
-          payload.append('payload', JSON.stringify({
-            project,
-            date: permitData.date,
-            time: permitData.time,
-            permitTypeName: permitData.permitTypeName,
-            location: permitData.location,
-            contractor: permitData.contractor,
-            supervisor: permitData.supervisor,
-            workDescription: permitData.workDescription,
-            hazards: permitData.hazards,
-            controlMeasures: permitData.controlMeasures,
-            permitIssuer: permitData.permitIssuer,
-            validFrom: permitData.validFrom,
-            validTo: permitData.validTo,
-            status: permitData.status
-          }));
+    async function syncToGoogleSheets(permitData) {
+  try {
+    const payload = new URLSearchParams();
+    payload.append('payload', JSON.stringify({
+      project: project,                       // must exactly match: 'TWS O-16123' or 'TW O-16124'
+      date: permitData.date,
+      time: permitData.time,
+      permitTypeName: permitData.permitTypeName,
+      location: permitData.location,
+      contractor: permitData.contractor,
+      supervisor: permitData.supervisor,
+      workDescription: permitData.workDescription,
+      hazards: permitData.hazards,
+      controlMeasures: permitData.controlMeasures,
+      permitIssuer: permitData.permitIssuer,
+      validFrom: permitData.validFrom,
+      validTo: permitData.validTo,
+      status: permitData.status
+    }));
 
-          const res = await fetch(APPS_SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
-            body: payload.toString()
-          });
-          const txt = await res.text();
-          let json;
-          try { json = JSON.parse(txt); }
-          catch (parseErr) {
-            console.error('POST response not JSON. Raw text:', txt);
-            throw new Error('Invalid JSON from Apps Script (see console for raw).');
-          }
-          if (!json.ok) throw new Error(json.error || 'Apps Script error');
-          return true;
-        } catch (err) {
-          console.error('Save error:', err);
-          return false;
-        } finally {
-          setSyncing(false);
-        }
-      }
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+      body: payload.toString()
+    });
 
-      async function handleSubmit() {
-        if (!permitType || !formData.date || !formData.location || !formData.contractor || !formData.supervisor) {
-          setNotification('⚠️ Please fill in all required fields.');
-          setTimeout(() => setNotification(''), 3000);
-          return;
-        }
-        const permitTypeName = permitTypes.find(p => p.id === permitType).name;
-        const newPermit = {
-          id: Date.now(),
-          project,
-          permitType,
-          permitTypeName,
-          date: formData.date,
-          time: formData.time,
-          location: formData.location,
-          contractor: formData.contractor,
-          supervisor: formData.supervisor,
-          workDescription: formData.workDescription,
-          hazards: formData.hazards,
-          controlMeasures: formData.controlMeasures,
-          permitIssuer: formData.permitIssuer,
-          validFrom: formData.validFrom,
-          validTo: formData.validTo,
-          status: formData.status,
-          createdAt: new Date().toISOString()
-        };
-
-        setNotification('💾 Saving to Google Sheets…');
-        const ok = await syncToGoogleSheets(newPermit);
-        if (ok) {
-          setNotification('✅ Saved to Google Sheets');
-          await fetchPermitsFromSheet(project);
-        } else {
-          setNotification('❌ Save failed (see console)');
-        }
-        setTimeout(() => setNotification(''), 3000);
-        setShowForm(false);
-        resetForm();
-      }
+    // The web app returns JSON; read it robustly
+    const text = await res.text();
+    let json;
+    try { json = JSON.parse(text); } catch { throw new Error('Apps Script did not return JSON: ' + text); }
+    if (!json.ok && !json.success) throw new Error(json.error || 'Apps Script error');
+    return true;
+  } catch (err) {
+    console.error('Save error:', err);
+    return false;
+  }
+}
 
       function resetForm() {
         setFormData({
