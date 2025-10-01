@@ -12,11 +12,10 @@
   <div id="root"></div>
 
   <script>
-    const { useState, useEffect } = React;
+    const { useState, useEffect, useMemo, useRef } = React;
     const e = React.createElement;
 
-    /* IMPORTANT: Use the SAME Apps Script URL for GET and POST.
-       Paste the Web App "exec" (or googleusercontent/echo) URL that returned ok:true. */
+    // Use the SAME URL that returned ok:true in your GET test
     const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxQaDcmdWmIQHiHXMPabGpLYEefn5jW-T1ZJREOL-N53JXPfiudzCJYTp0fnSjaVjMm/exec';
 
     function PermitLogSystem() {
@@ -27,6 +26,8 @@
       const [notification, setNotification] = useState('');
       const [syncing, setSyncing] = useState(false);
       const [loading, setLoading] = useState(false);
+      const [errors, setErrors] = useState({});
+      const firstErrorRef = useRef(null);
 
       const projects = ['TWS O-16123', 'TW O-16124'];
 
@@ -52,11 +53,17 @@
         status: 'Active'
       });
 
-      /* ------- READ from Google Sheets whenever project changes ------- */
-      useEffect(() => {
-        fetchPermitsFromSheet(project);
-        // eslint-disable-next-line
-      }, [project]);
+      // Which fields are required
+      const required = useMemo(() => ({
+        permitType: 'Permit Type',
+        date: 'Date',
+        time: 'Time',
+        location: 'Location',
+        contractor: 'Contractor',
+        supervisor: 'Supervisor'
+      }), []);
+
+      useEffect(() => { fetchPermitsFromSheet(project); }, [project]);
 
       async function fetchPermitsFromSheet(proj) {
         try {
@@ -97,7 +104,6 @@
         }
       }
 
-      /* ------- WRITE to Google Sheets ------- */
       async function syncToGoogleSheets(permitData) {
         try {
           setSyncing(true);
@@ -134,19 +140,34 @@
           return true;
         } catch (err) {
           console.error('Save error:', err);
+          setNotification('❌ Save failed: ' + (err.message || err));
           return false;
         } finally {
           setSyncing(false);
+          setTimeout(() => setNotification(''), 3500);
         }
       }
 
-      /* ------- SUBMIT (kept inside component so hooks are in scope) ------- */
-      async function handleSubmit() {
-        if (!permitType || !formData.date || !formData.location || !formData.contractor || !formData.supervisor) {
-          setNotification('⚠️ Please fill in all required fields.');
-          setTimeout(() => setNotification(''), 3000);
-          return;
+      function validate() {
+        const errs = {};
+        if (!permitType) errs.permitType = 'Required';
+        for (const key of ['date','time','location','contractor','supervisor']) {
+          if (!formData[key] || (typeof formData[key] === 'string' && formData[key].trim() === '')) {
+            errs[key] = 'Required';
+          }
         }
+        setErrors(errs);
+        // focus/scroll to first error
+        if (Object.keys(errs).length) {
+          const el = firstErrorRef.current;
+          if (el && typeof el.scrollIntoView === 'function') el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return false;
+        }
+        return true;
+      }
+
+      async function handleSubmit() {
+        if (!validate()) return;
 
         const permitTypeName = permitTypes.find(p => p.id === permitType).name;
 
@@ -176,17 +197,13 @@
         if (ok) {
           setNotification('✅ Saved to Google Sheets');
           await fetchPermitsFromSheet(project);
-        } else {
-          setNotification('❌ Save failed (see console)');
+          setShowForm(false);
+          resetForm();
         }
-
-        setTimeout(() => setNotification(''), 3000);
-        setShowForm(false);
-        resetForm();
       }
 
-      /* ------- Utilities ------- */
       function resetForm() {
+        setErrors({});
         setFormData({
           date: new Date().toISOString().split('T')[0],
           time: new Date().toTimeString().split(' ')[0].substring(0, 5),
@@ -221,7 +238,17 @@
         document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
       }
 
-      /* ------- UI ------- */
+      const isInvalid = Object.keys(errors).length > 0;
+
+      const inputClass = (name) =>
+        'w-full border rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none ' +
+        (errors[name] ? 'border-red-400' : 'border-gray-300');
+
+      const label = (text, name) =>
+        e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' },
+          text, errors[name] ? e('span', { className: 'text-red-500 ml-1' }, '*') : null
+        );
+
       return e('div', { className: 'min-h-screen p-6' },
         e('div', { className: 'max-w-7xl mx-auto' },
           e('div', { className: 'bg-white rounded-lg shadow p-6 mb-6' },
@@ -232,7 +259,7 @@
               ),
               e('div', { className: 'flex items-center gap-2' },
                 e('button', {
-                  onClick: () => setShowForm(s => !s),
+                  onClick: () => { setShowForm(s => !s); setErrors({}); },
                   disabled: syncing,
                   className: 'bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition disabled:bg-gray-400'
                 }, showForm ? 'Cancel' : '+ New Permit')
@@ -240,7 +267,7 @@
             ),
             e('div', { className: 'flex gap-4 items-end flex-wrap mt-4' },
               e('div', null,
-                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Project'),
+                label('Project', null),
                 e('select', {
                     value: project,
                     onChange: (ev) => setProject(ev.target.value),
@@ -261,57 +288,65 @@
 
           notification && e('div', {
               className:
-                notification.includes('✅') ? 'bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg mb-6' :
-                notification.includes('💾') ? 'bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded-lg mb-6' :
+                notification.startsWith('✅') ? 'bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg mb-6' :
+                notification.startsWith('💾') ? 'bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded-lg mb-6' :
+                notification.startsWith('❌') ? 'bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg mb-6' :
                 'bg-orange-100 border border-orange-400 text-orange-700 px-4 py-3 rounded-lg mb-6'
             }, notification),
 
           showForm && e('div', { className: 'bg-white rounded-lg shadow p-6 mb-6' },
             e('h2', { className: 'text-xl font-bold text-gray-800 mb-4' }, 'New Permit Entry'),
             e('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-4 mb-4' },
-              e('div', null,
-                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Permit Type *'),
+
+              e('div', { ref: el => { if (errors.permitType) firstErrorRef.current = el; } },
+                label('Permit Type *', 'permitType'),
                 e('select', {
                     value: permitType,
-                    onChange: (ev) => setPermitType(ev.target.value),
-                    className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none'
+                    onChange: (ev) => { setPermitType(ev.target.value); setErrors(s => ({ ...s, permitType: undefined })); },
+                    className: inputClass('permitType')
                   },
                   e('option', { value: '' }, 'Select Permit Type'),
                   permitTypes.map(t => e('option', { key: t.id, value: t.id }, t.name))
                 )
               ),
-              e('div', null,
-                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Date *'),
+
+              e('div', { ref: el => { if (errors.date) firstErrorRef.current = el; } },
+                label('Date *', 'date'),
                 e('input', { type: 'date', value: formData.date,
-                  onChange: (ev) => setFormData({ ...formData, date: ev.target.value }),
-                  className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none' })
+                  onChange: (ev) => { setFormData({ ...formData, date: ev.target.value }); setErrors(s => ({ ...s, date: undefined })); },
+                  className: inputClass('date') })
               ),
-              e('div', null,
-                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Time *'),
+
+              e('div', { ref: el => { if (errors.time) firstErrorRef.current = el; } },
+                label('Time *', 'time'),
                 e('input', { type: 'time', value: formData.time,
-                  onChange: (ev) => setFormData({ ...formData, time: ev.target.value }),
-                  className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none' })
+                  onChange: (ev) => { setFormData({ ...formData, time: ev.target.value }); setErrors(s => ({ ...s, time: undefined })); },
+                  className: inputClass('time') })
               ),
-              e('div', null,
-                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Location *'),
+
+              e('div', { ref: el => { if (errors.location) firstErrorRef.current = el; } },
+                label('Location *', 'location'),
                 e('input', { type: 'text', value: formData.location, placeholder: 'Site location',
-                  onChange: (ev) => setFormData({ ...formData, location: ev.target.value }),
-                  className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none' })
+                  onChange: (ev) => { setFormData({ ...formData, location: ev.target.value }); setErrors(s => ({ ...s, location: undefined })); },
+                  className: inputClass('location') })
               ),
-              e('div', null,
-                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Contractor *'),
+
+              e('div', { ref: el => { if (errors.contractor) firstErrorRef.current = el; } },
+                label('Contractor *', 'contractor'),
                 e('input', { type: 'text', value: formData.contractor, placeholder: 'Contractor name',
-                  onChange: (ev) => setFormData({ ...formData, contractor: ev.target.value }),
-                  className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none' })
+                  onChange: (ev) => { setFormData({ ...formData, contractor: ev.target.value }); setErrors(s => ({ ...s, contractor: undefined })); },
+                  className: inputClass('contractor') })
               ),
-              e('div', null,
-                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Supervisor *'),
+
+              e('div', { ref: el => { if (errors.supervisor) firstErrorRef.current = el; } },
+                label('Supervisor *', 'supervisor'),
                 e('input', { type: 'text', value: formData.supervisor, placeholder: 'Supervisor name',
-                  onChange: (ev) => setFormData({ ...formData, supervisor: ev.target.value }),
-                  className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none' })
+                  onChange: (ev) => { setFormData({ ...formData, supervisor: ev.target.value }); setErrors(s => ({ ...s, supervisor: undefined })); },
+                  className: inputClass('supervisor') })
               ),
+
               e('div', { className: 'md:col-span-2' },
-                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Work Description'),
+                label('Work Description', null),
                 e('textarea', {
                   value: formData.workDescription, rows: 2, placeholder: 'Describe the work',
                   onChange: (ev) => setFormData({ ...formData, workDescription: ev.target.value }),
@@ -319,7 +354,7 @@
                 })
               ),
               e('div', { className: 'md:col-span-2' },
-                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Hazards'),
+                label('Hazards', null),
                 e('textarea', {
                   value: formData.hazards, rows: 2, placeholder: 'List hazards',
                   onChange: (ev) => setFormData({ ...formData, hazards: ev.target.value }),
@@ -327,7 +362,7 @@
                 })
               ),
               e('div', { className: 'md:col-span-2' },
-                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Control Measures'),
+                label('Control Measures', null),
                 e('textarea', {
                   value: formData.controlMeasures, rows: 2, placeholder: 'Safety measures',
                   onChange: (ev) => setFormData({ ...formData, controlMeasures: ev.target.value }),
@@ -335,13 +370,13 @@
                 })
               ),
               e('div', null,
-                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Permit Issuer'),
+                label('Permit Issuer', null),
                 e('input', { type: 'text', value: formData.permitIssuer, placeholder: 'Issuer name',
                   onChange: (ev) => setFormData({ ...formData, permitIssuer: ev.target.value }),
                   className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none' })
               ),
               e('div', null,
-                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Status'),
+                label('Status', null),
                 e('select', {
                     value: formData.status,
                     onChange: (ev) => setFormData({ ...formData, status: ev.target.value }),
@@ -353,13 +388,13 @@
                 )
               ),
               e('div', null,
-                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Valid From'),
+                label('Valid From', null),
                 e('input', { type: 'datetime-local', value: formData.validFrom,
                   onChange: (ev) => setFormData({ ...formData, validFrom: ev.target.value }),
                   className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none' })
               ),
               e('div', null,
-                e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Valid To'),
+                label('Valid To', null),
                 e('input', { type: 'datetime-local', value: formData.validTo,
                   onChange: (ev) => setFormData({ ...formData, validTo: ev.target.value }),
                   className: 'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none' })
