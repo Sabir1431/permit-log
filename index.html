@@ -18,6 +18,19 @@
     /* ---- YOUR Apps Script Web App URL (exec) ---- */
     const APPS_SCRIPT_URL =
       'https://script.google.com/macros/s/AKfycbxr4260knjEbE5YUK1Igq9F2un5kq-AtXnxpZxaRCQSn9TgaOHUM8cu2WLV2_gys9Md/exec';
+// put this near the top of App(), after useState/useEffect
+function countType(keyword) {
+  return permits.filter(p =>
+    (p.permitTypeName || '').toLowerCase().includes(keyword.toLowerCase())
+  ).length;
+}
+
+const statCards = [
+  { key: 'confined',  label: 'Confined Space Entry',  color: 'bg-blue-100 border-blue-300' , count: () => countType('Confined Space Entry') },
+  { key: 'excav',     label: 'Excavation',            color: 'bg-green-100 border-green-300', count: () => countType('Excavation') },
+  { key: 'height',    label: 'Work at Height',        color: 'bg-yellow-100 border-yellow-300', count: () => countType('Work at Height') },
+  { key: 'lifting',    label: 'Lifting Operation',     color: 'bg-purple-100 border-purple-300', count: () => countType('Lifting Operation') }
+];
 
     /* ------------------- APP ------------------- */
     function App() {
