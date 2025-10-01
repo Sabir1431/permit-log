@@ -17,7 +17,52 @@
 
     // Paste your Apps Script *exec* URL here
     const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxQaDcmdWmIQHiHXMPabGpLYEefn5jW-T1ZJREOL-N53JXPfiudzCJYTp0fnSjaVjMm/exec';
+async function handleSubmit() {
+  // Basic validation
+  if (!permitType || !formData.date || !formData.location || !formData.contractor || !formData.supervisor) {
+    setNotification('⚠️ Please fill in all required fields.');
+    setTimeout(() => setNotification(''), 3000);
+    return;
+  }
 
+  // Map selected id → full permit type name
+  const permitTypeName = permitTypes.find(p => p.id === permitType).name;
+
+  const newPermit = {
+    id: Date.now(),
+    project,
+    permitType,
+    permitTypeName,
+    date: formData.date,
+    time: formData.time,
+    location: formData.location,
+    contractor: formData.contractor,
+    supervisor: formData.supervisor,
+    workDescription: formData.workDescription,
+    hazards: formData.hazards,
+    controlMeasures: formData.controlMeasures,
+    permitIssuer: formData.permitIssuer,
+    validFrom: formData.validFrom,
+    validTo: formData.validTo,
+    status: formData.status,
+    createdAt: new Date().toISOString()
+  };
+
+  // Save via Apps Script
+  setNotification('💾 Saving to Google Sheets…');
+  const ok = await syncToGoogleSheets(newPermit);
+
+  if (ok) {
+    setNotification('✅ Saved to Google Sheets');
+    await fetchPermitsFromSheet(project); // refresh from the sheet
+  } else {
+    setNotification('❌ Save failed (see console)');
+  }
+
+  setTimeout(() => setNotification(''), 3000);
+  setShowForm(false);
+  resetForm();
+}
     function PermitLogSystem() {
       const [project, setProject] = useState('TWS O-16123');
       const [permitType, setPermitType] = useState('');
