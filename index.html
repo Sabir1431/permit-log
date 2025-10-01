@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Construction Permit Log System</title>
+  <title>TAQA WS Contracts O-16123 & O-16124 Permit Log System</title>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -19,7 +19,7 @@
     const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxQaDcmdWmIQHiHXMPabGpLYEefn5jW-T1ZJREOL-N53JXPfiudzCJYTp0fnSjaVjMm/exec';
 
     function PermitLogSystem() {
-      const [project, setProject] = useState('TWS O-16123');
+      const [projects, setProject] = useState('TWS O-16123');
       const [permitType, setPermitType] = useState('');
       const [permits, setPermits] = useState([]);
       const [showForm, setShowForm] = useState(false);
