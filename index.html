@@ -9,7 +9,7 @@
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
-  <!-- Tailwind (ok for testing; for prod, install via PostCSS/CLI) -->
+  <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-50">
@@ -19,7 +19,7 @@
     const { useState, useEffect, useRef } = React;
     const e = React.createElement;
 
-    // 🔧 Your deployed Apps Script Web App "exec" URL
+    // 🔧 Deployed Apps Script URL
     const APPS_SCRIPT_URL =
       'https://script.google.com/macros/s/AKfycbxr4260knjEbE5YUK1Igq9F2un5kq-AtXnxpZxaRCQSn9TgaOHUM8cu2WLV2_gys9Md/exec';
 
@@ -34,17 +34,16 @@
       const [saving, setSaving] = useState(false);
       const firstErrorRef = useRef(null);
 
-      // keys must match the server's SHEET_IDS/TAB_NAMES
       const projects = ['TWS O-16123', 'TW O-16124'];
 
-     const permitTypes = [
-  { id: 'confined-space', name: 'SOF-3542-I Confined Space Entry' },
-  { id: 'excavation',     name: 'SOF-3542-H Excavation' },
-  { id: 'work-height',    name: 'SOF-3542-E Work at Height' },
-  { id: 'lifting',        name: 'SOF-3542-C Lifting Operation' },
-  { id: 'hot-work',       name: 'SOF-3542-B Hot Work Permit' } // 🔥 added new permit type
-];
-
+      // ✅ Added Hot Work Permit
+      const permitTypes = [
+        { id: 'confined-space', name: 'SOF-3542-I Confined Space Entry' },
+        { id: 'excavation',     name: 'SOF-3542-H Excavation' },
+        { id: 'work-height',    name: 'SOF-3542-E Work at Height' },
+        { id: 'lifting',        name: 'SOF-3542-C Lifting Operation' },
+        { id: 'hot-work',       name: 'SOF-3542-B Hot Work Permit' } // 🔥 added
+      ];
 
       const [form, setForm] = useState({
         date: new Date().toISOString().split('T')[0],
@@ -74,7 +73,7 @@
           let json; try { json = JSON.parse(text); } catch { throw new Error('Invalid JSON: ' + text); }
           if (!json.ok) throw new Error(json.error || 'load failed');
 
-          const rawRows = (json.rows || []);
+          const rawRows = json.rows || [];
           const list = rawRows.map((r, i) => ({
             id: `${Date.now()}_${i}`,
             project: proj,
@@ -220,19 +219,18 @@
         return permits.filter(p => (p.permitTypeName || '').toLowerCase().includes(label.toLowerCase())).length;
       }
 
-     const statCards = [
-  { key: 'confined', label: 'Confined Space Entry', color: 'bg-blue-100 border-blue-300',    count: () => countTypeContains('confined')  },
-  { key: 'excav',    label: 'Excavation',           color: 'bg-green-100 border-green-300', count: () => countTypeContains('excavation') },
-  { key: 'height',   label: 'Work at Height',       color: 'bg-yellow-100 border-yellow-300', count: () => countTypeContains('height')   },
-  { key: 'lifting',  label: 'Lifting Operation',    color: 'bg-purple-100 border-purple-300', count: () => countTypeContains('lifting')  },
-  { key: 'hotwork',  label: 'Hot Work Permit',      color: 'bg-red-100 border-red-300',       count: () => countTypeContains('hot work') } // 🔥 new card
-];
-
+      // ✅ Added Hot Work stat card
+      const statCards = [
+        { key: 'confined', label: 'Confined Space Entry', color: 'bg-blue-100 border-blue-300', count: () => countTypeContains('confined') },
+        { key: 'excav',    label: 'Excavation',           color: 'bg-green-100 border-green-300', count: () => countTypeContains('excavation') },
+        { key: 'height',   label: 'Work at Height',       color: 'bg-yellow-100 border-yellow-300', count: () => countTypeContains('height') },
+        { key: 'lifting',  label: 'Lifting Operation',    color: 'bg-purple-100 border-purple-300', count: () => countTypeContains('lifting') },
+        { key: 'hotwork',  label: 'Hot Work Permit',      color: 'bg-red-100 border-red-300', count: () => countTypeContains('hot work') }
+      ];
 
       return e('div', { className: 'min-h-screen p-6' },
         e('div', { className: 'max-w-7xl mx-auto' },
 
-          // Header & New Permit button
           e('div', { className: 'bg-white rounded-lg shadow p-6 mb-6' },
             e('div', { className: 'flex items-center justify-between gap-4 flex-wrap' },
               e('div', null,
@@ -248,7 +246,6 @@
             )
           ),
 
-          // Project selector + actions
           e('div', { className: 'flex gap-4 items-end flex-wrap mt-4' },
             e('div', null,
               e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Project'),
@@ -269,7 +266,6 @@
             }, '📥 Download CSV')
           ),
 
-          // Toast / Server error
           note && e('div', {
             className:
               note.startsWith('✅') ? 'bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg mb-4' :
@@ -282,12 +278,10 @@
             className: 'bg-rose-50 border border-rose-300 text-rose-700 px-4 py-2 rounded mb-6 text-sm'
           }, 'Server error: ', e('code', { className: 'break-all' }, serverError)),
 
-          // Form
           showForm && e('div', { className: 'bg-white rounded-lg shadow p-6 mb-6' },
             e('h2', { className: 'text-xl font-bold text-gray-800 mb-4' }, 'New Permit Entry'),
 
             e('div', { className: 'grid grid-cols-1 md:grid-cols-2 gap-4 mb-4' },
-
               e('div', { ref: el => { if (errors.permitType) firstErrorRef.current = el; } },
                 e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Permit Type *'),
                 e('select', {
@@ -300,7 +294,6 @@
                   permitTypes.map(t => e('option', { key: t.id, value: t.id }, t.name))
                 )
               ),
-
               e('div', null,
                 e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Date *'),
                 e('input', {
@@ -309,7 +302,6 @@
                   className: inputClass('date'), autoComplete: 'off'
                 })
               ),
-
               e('div', null,
                 e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Time *'),
                 e('input', {
@@ -318,16 +310,14 @@
                   className: inputClass('time'), autoComplete: 'off'
                 })
               ),
-
               e('div', null,
                 e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Permit No.'),
                 e('input', {
-                  name: 'permitNo', type: 'text', value: form.permitNo, placeholder: 'e.g., CSE-0007',
+                  name: 'permitNo', type: 'text', value: form.permitNo,
                   onChange: ev => setForm({ ...form, permitNo: ev.target.value }),
                   className: inputClass('permitNo'), autoComplete: 'off'
                 })
               ),
-
               e('div', null,
                 e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Location *'),
                 e('input', {
@@ -336,7 +326,6 @@
                   className: inputClass('location'), autoComplete: 'off'
                 })
               ),
-
               e('div', null,
                 e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Contractor *'),
                 e('input', {
@@ -345,7 +334,6 @@
                   className: inputClass('contractor'), autoComplete: 'off'
                 })
               ),
-
               e('div', null,
                 e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Supervisor *'),
                 e('input', {
@@ -354,7 +342,6 @@
                   className: inputClass('supervisor'), autoComplete: 'off'
                 })
               ),
-
               e('div', { className: 'md:col-span-2' },
                 e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Work Description'),
                 e('textarea', {
@@ -364,7 +351,6 @@
                   autoComplete: 'off'
                 })
               ),
-
               e('div', { className: 'md:col-span-2' },
                 e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Hazards'),
                 e('textarea', {
@@ -374,7 +360,6 @@
                   autoComplete: 'off'
                 })
               ),
-
               e('div', { className: 'md:col-span-2' },
                 e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Control Measures'),
                 e('textarea', {
@@ -384,7 +369,6 @@
                   autoComplete: 'off'
                 })
               ),
-
               e('div', null,
                 e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Permit Issuer'),
                 e('input', {
@@ -393,7 +377,6 @@
                   className: inputClass('permitIssuer'), autoComplete: 'off'
                 })
               ),
-
               e('div', null,
                 e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Status'),
                 e('select', {
@@ -406,7 +389,6 @@
                   e('option', { value: 'Suspended' }, 'Suspended')
                 )
               ),
-
               e('div', null,
                 e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Valid From'),
                 e('input', {
@@ -415,7 +397,6 @@
                   className: inputClass('validFrom')
                 })
               ),
-
               e('div', null,
                 e('label', { className: 'block text-sm font-medium text-gray-700 mb-1' }, 'Valid To'),
                 e('input', {
@@ -425,7 +406,6 @@
                 })
               )
             ),
-
             e('div', { className: 'flex gap-3 justify-end' },
               e('button', {
                 onClick: () => { setShowForm(false); resetForm(); },
@@ -439,8 +419,7 @@
             )
           ),
 
-          // Stat cards
-          e('div', { className: 'grid grid-cols-1 md:grid-cols-4 gap-4 mb-6' },
+          e('div', { className: 'grid grid-cols-1 md:grid-cols-5 gap-4 mb-6' },
             statCards.map(c =>
               e('div', { key: c.key, className: `${c.color} border-2 rounded-lg p-4` },
                 e('div', { className: 'text-2xl font-bold text-gray-800' }, c.count()),
@@ -449,7 +428,6 @@
             )
           ),
 
-          // Table
           e('div', { className: 'bg-white rounded-lg shadow p-6' },
             e('h2', { className: 'text-xl font-bold text-gray-800 mb-4' }, `Permit Log - ${project}`),
             permits.length === 0
@@ -489,7 +467,6 @@
       );
     }
 
-    // React 18 mount
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(e(App));
   </script>
