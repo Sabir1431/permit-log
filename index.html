@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>TAQA WS Contracts O-16123 & O-16124 Permit Log System</title>
+  <title>TAQA WS Contracts Permit Log System</title>
   <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
@@ -15,10 +15,9 @@
     const { useState, useEffect, useRef } = React;
     const e = React.createElement;
 
-    /* ======== YOUR APPS SCRIPT WEB-APP (exec) URL ======== */
+    // ⚠️ REPLACE WITH YOUR APPS SCRIPT URL
     const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxr4260knjEbE5YUK1Igq9F2un5kq-AtXnxpZxaRCQSn9TgaOHUM8cu2WLV2_gys9Md/exec';
 
-    /* ======== APP ======== */
     function App() {
       const [project, setProject] = useState('TWS O-16123');
       const [permitType, setPermitType] = useState('');
@@ -78,14 +77,14 @@
             supervisor: (r['Supervisor']||'').toString(),
             workDescription: (r['Work Description']||'').toString(),
             hazards: (r['Hazards']||'').toString(),
-            controlMeasures: (r['Control Measure'] || r['Control Measures'] || '').toString(),
+            controlMeasures: (r['Control Measures'] || r['Control Measure'] || '').toString(),
             permitIssuer: (r['Permit Issuer']||'').toString(),
             validFrom: (r['Valid From']||'').toString(),
             validTo: (r['Valid To']||'').toString(),
             status: (r['Status']||'').toString() || 'Active'
           }));
           setPermits(list.reverse());
-          toast('☁️ Loaded from Google Sheets');
+          toast('☁️ Loaded ' + list.length + ' permits');
         } catch (err) {
           setServerError(String(err));
           toast('⚠️ Could not load from Google Sheets');
@@ -181,7 +180,7 @@
         if (!permits.length) return;
         const headers = [
           'Date','Time','Permit No.','Permit Type','Location','Contractor','Supervisor',
-          'Work Description','Hazards','Control Measure','Permit Issuer','Valid From','Valid To','Status'
+          'Work Description','Hazards','Control Measures','Permit Issuer','Valid From','Valid To','Status'
         ];
         const rows = permits.map(p => [
           p.date, p.time, p.permitNo, p.permitTypeName, p.location, p.contractor, p.supervisor,
@@ -204,25 +203,24 @@
       function toast(msg){ setNote(msg); }
       function clearToastSoon(){ setTimeout(()=>setNote(''), 3000); }
 
-      /* ---------- SUMMARY CARDS (RESTORED) ---------- */
       function countTypeContains(label) {
         return permits.filter(p => (p.permitTypeName || '').toLowerCase().includes(label.toLowerCase())).length;
       }
+      
       const statCards = [
-        { key: 'confined', label: 'Confined Space Entry', color: 'bg-blue-100 border-blue-300',   count: () => countTypeContains('Confined Space Entry') },
+        { key: 'confined', label: 'Confined Space Entry', color: 'bg-blue-100 border-blue-300',   count: () => countTypeContains('Confined Space') },
         { key: 'excav',    label: 'Excavation',           color: 'bg-green-100 border-green-300', count: () => countTypeContains('Excavation') },
-        { key: 'height',   label: 'Work at Height',       color: 'bg-yellow-100 border-yellow-300', count: () => countTypeContains('Work at Height') },
-        { key: 'lifting',  label: 'Lifting Operation',     color: 'bg-purple-100 border-purple-300', count: () => countTypeContains('Lifting Operation') }
+        { key: 'height',   label: 'Work at Height',       color: 'bg-yellow-100 border-yellow-300', count: () => countTypeContains('Height') },
+        { key: 'lifting',  label: 'Lifting Operation',     color: 'bg-purple-100 border-purple-300', count: () => countTypeContains('Lifting') }
       ];
 
       return e('div', { className:'min-h-screen p-6' },
         e('div', { className:'max-w-7xl mx-auto' },
 
-          // Header / Controls
           e('div', { className:'bg-white rounded-lg shadow p-6 mb-6' },
             e('div', { className:'flex items-center justify-between gap-4 flex-wrap' },
               e('div', null,
-                e('h1',{className:'text-2xl md:text-3xl font-bold text-gray-800'},'TAQA WS Contracts O-16123 & O-16124 Permit Log System'),
+                e('h1',{className:'text-2xl md:text-3xl font-bold text-gray-800'},'TAQA WS Contracts Permit Log System'),
                 e('p',{className:'text-xs text-green-600 mt-1'},'☁️ Connected to Google Sheets')
               ),
               e('div',{className:'flex items-center gap-2'},
@@ -253,7 +251,6 @@
             )
           ),
 
-          // Notifications / server error
           note && e('div', { className:
             note.startsWith('✅') ? 'bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg mb-4' :
             note.startsWith('💾') ? 'bg-blue-100 border border-blue-400 text-blue-700 px-4 py-3 rounded-lg mb-4' :
@@ -265,7 +262,6 @@
             'Server error: ', e('code',{className:'break-all'},serverError)
           ),
 
-          // New Permit Form
           showForm && e('div',{className:'bg-white rounded-lg shadow p-6 mb-6'},
             e('h2',{className:'text-xl font-bold text-gray-800 mb-4'},'New Permit Entry'),
             e('div',{className:'grid grid-cols-1 md:grid-cols-2 gap-4 mb-4'},
@@ -354,7 +350,6 @@
             )
           ),
 
-          /* ---------- SUMMARY CARDS (RESTORED) ---------- */
           e('div', { className: 'grid grid-cols-1 md:grid-cols-4 gap-4 mb-6' },
             statCards.map(c =>
               e('div', { key: c.key, className: `${c.color} border-2 rounded-lg p-4` },
@@ -364,11 +359,10 @@
             )
           ),
 
-          // Table
           e('div',{className:'bg-white rounded-lg shadow p-6'},
             e('h2',{className:'text-xl font-bold text-gray-800 mb-4'},`Permit Log - ${project}`),
             permits.length===0
-              ? e('div',{className:'text-center py-12 text-gray-500'}, e('p',null,loading?'Loading…':'No data.'))
+              ? e('div',{className:'text-center py-12 text-gray-500'}, e('p',null,loading?'Loading…':'No permits yet. Click "+ New Permit" to add one.'))
               : e('div',{className:'overflow-x-auto'},
                   e('table',{className:'w-full'},
                     e('thead',{className:'bg-gray-50'},
@@ -378,7 +372,7 @@
                       permits.map(p => e('tr',{key:p.id,className:'hover:bg-gray-50'},
                         e('td',{className:'px-4 py-3 text-sm text-gray-800'},p.date),
                         e('td',{className:'px-4 py-3 text-sm text-gray-800'},p.time),
-                        e('td',{className:'px-4 py-3 text-sm text-gray-800'},p.permitNo||''),
+                        e('td',{className:'px-4 py-3 text-sm text-gray-800'},p.permitNo||'-'),
                         e('td',{className:'px-4 py-3 text-sm'},
                           e('span',{className:'inline-block px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs'},p.permitTypeName)
                         ),
