@@ -15,7 +15,7 @@
     const { useState, useEffect, useRef } = React;
     const e = React.createElement;
 
-    // ⚠️ REPLACE WITH YOUR APPS SCRIPT URL
+    // ⚠️ REPLACE WITH YOUR APPS SCRIPT URL (the deployed /exec endpoint)
     const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxr4260knjEbE5YUK1Igq9F2un5kq-AtXnxpZxaRCQSn9TgaOHUM8cu2WLV2_gys9Md/exec';
 
     function App() {
@@ -29,7 +29,8 @@
       const [saving, setSaving] = useState(false);
       const firstErrorRef = useRef(null);
 
-      const projects = ['TWS O-16123','TW O-16124'];
+      // Use consistent TWS project names
+      const projects = ['TWS O-16123','TWS O-16124'];
       const permitTypes = [
         { id: 'confined-space', name: 'SOF-3542-I Confined Space Entry' },
         { id: 'excavation',     name: 'SOF-3542-H Excavation' },
@@ -62,25 +63,30 @@
           setLoading(true);
           const res = await fetch(`${APPS_SCRIPT_URL}?action=list&project=${encodeURIComponent(proj)}`);
           const text = await res.text();
-          let json; try { json = JSON.parse(text); } catch { throw new Error('Invalid JSON: '+text); }
+          let json; try { json = JSON.parse(text); } catch (err) {
+            throw new Error('Invalid JSON from server: ' + String(text).slice(0,200));
+          }
           if (!json.ok) throw new Error(json.error || 'Load failed');
 
-          const list = (json.rows || []).map((r, i) => ({
+          const rawRows = (json.rows || []);
+          console.log('Server returned rows count:', rawRows.length);
+
+          const list = rawRows.map((r, i) => ({
             id: `${Date.now()}_${i}`,
             project: proj,
             date: (r['Date']||'').toString(),
             time: (r['Time']||'').toString(),
-            permitNo: (r['Permit No.'] || r['Permit No'] || '').toString(),
-            permitTypeName: (r['Permit Type']||'').toString(),
+            permitNo: (r['Permit No.'] || r['Permit No'] || r['PermitNo'] || '').toString(),
+            permitTypeName: (r['Permit Type']||r['PermitType']||'').toString(),
             location: (r['Location']||'').toString(),
             contractor: (r['Contractor']||'').toString(),
             supervisor: (r['Supervisor']||'').toString(),
-            workDescription: (r['Work Description']||'').toString(),
-            hazards: (r['Hazards']||'').toString(),
-            controlMeasures: (r['Control Measures'] || r['Control Measure'] || '').toString(),
-            permitIssuer: (r['Permit Issuer']||'').toString(),
-            validFrom: (r['Valid From']||'').toString(),
-            validTo: (r['Valid To']||'').toString(),
+            workDescription: (r['Work Description']||r['WorkDescription']||'').toString(),
+            hazards: (r['Hazards']||r['Hazard']||'').toString(),
+            controlMeasures: (r['Control Measures'] || r['ControlMeasure'] || '').toString(),
+            permitIssuer: (r['Permit Issuer']||r['PermitIssuer']||'').toString(),
+            validFrom: (r['Valid From']||r['ValidFrom']||'').toString(),
+            validTo: (r['Valid To']||r['ValidTo']||'').toString(),
             status: (r['Status']||'').toString() || 'Active'
           }));
           setPermits(list.reverse());
@@ -206,7 +212,7 @@
       function countTypeContains(label) {
         return permits.filter(p => (p.permitTypeName || '').toLowerCase().includes(label.toLowerCase())).length;
       }
-      
+
       const statCards = [
         { key: 'confined', label: 'Confined Space Entry', color: 'bg-blue-100 border-blue-300',   count: () => countTypeContains('Confined Space') },
         { key: 'excav',    label: 'Excavation',           color: 'bg-green-100 border-green-300', count: () => countTypeContains('Excavation') },
@@ -242,6 +248,8 @@
                 )
               ),
               e('div',{className:'flex-1'}),
+
+              // Quick count badge (uses count endpoint if you want)
               e('button',{onClick:()=>loadFromSheet(project), className:'px-4 py-2 border rounded-lg hover:bg-gray-50'}, loading?'Refreshing…':'Refresh'),
               e('button',{
                 onClick:downloadCSV,
@@ -269,6 +277,7 @@
               e('div',{ref:el=>{ if(errors.permitType) firstErrorRef.current=el; }},
                 e('label',{className:'block text-sm font-medium text-gray-700 mb-1'},'Permit Type *'),
                 e('select',{
+                  name: 'permitType',
                   value:permitType,
                   onChange:ev=>{ setPermitType(ev.target.value); setErrors(s=>({...s,permitType:undefined})); },
                   className:inputClass('permitType')
@@ -280,55 +289,63 @@
 
               e('div',null,
                 e('label',{className:'block text-sm font-medium text-gray-700 mb-1'},'Date *'),
-                e('input',{type:'date',value:form.date,onChange:ev=>{setForm({...form,date:ev.target.value}); setErrors(s=>({...s,date:undefined}));}, className:inputClass('date')})
+                e('input',{type:'date',value:form.date,onChange:ev=>{setForm({...form,date:ev.target.value}); setErrors(s=>({...s,date:undefined}));}, className:inputClass('date'), name: 'date', autoComplete:'off'})
               ),
 
               e('div',null,
                 e('label',{className:'block text-sm font-medium text-gray-700 mb-1'},'Time *'),
-                e('input',{type:'time',value:form.time,onChange:ev=>{setForm({...form,time:ev.target.value}); setErrors(s=>({...s,time:undefined}));}, className:inputClass('time')})
+                e('input',{type:'time',value:form.time,onChange:ev=>{setForm({...form,time:ev.target.value}); setErrors(s=>({...s,time:undefined}));}, className:inputClass('time'), name:'time', autoComplete:'off'})
               ),
 
               e('div',null,
                 e('label',{className:'block text-sm font-medium text-gray-700 mb-1'},'Permit No.'),
-                e('input',{type:'text',value:form.permitNo, placeholder:'e.g., CSE-0007', onChange:ev=>setForm({...form,permitNo:ev.target.value}), className:inputClass('permitNo')})
+                e('input',{
+                  name: 'permitNo',
+                  type:'text',
+                  value:form.permitNo,
+                  placeholder:'e.g., CSE-0007',
+                  onChange:ev=>setForm({...form,permitNo:ev.target.value}),
+                  className:inputClass('permitNo'),
+                  autoComplete: 'off'
+                })
               ),
 
               e('div',null,
                 e('label',{className:'block text-sm font-medium text-gray-700 mb-1'},'Location *'),
-                e('input',{type:'text',value:form.location, onChange:ev=>{setForm({...form,location:ev.target.value}); setErrors(s=>({...s,location:undefined}));}, className:inputClass('location')})
+                e('input',{name:'location', type:'text', value:form.location, onChange:ev=>{setForm({...form,location:ev.target.value}); setErrors(s=>({...s,location:undefined}));}, className:inputClass('location'), autoComplete:'off'})
               ),
 
               e('div',null,
                 e('label',{className:'block text-sm font-medium text-gray-700 mb-1'},'Contractor *'),
-                e('input',{type:'text',value:form.contractor, onChange:ev=>{setForm({...form,contractor:ev.target.value}); setErrors(s=>({...s,contractor:undefined}));}, className:inputClass('contractor')})
+                e('input',{name:'contractor', type:'text', value:form.contractor, onChange:ev=>{setForm({...form,contractor:ev.target.value}); setErrors(s=>({...s,contractor:undefined}));}, className:inputClass('contractor'), autoComplete:'off'})
               ),
 
               e('div',null,
                 e('label',{className:'block text-sm font-medium text-gray-700 mb-1'},'Supervisor *'),
-                e('input',{type:'text',value:form.supervisor, onChange:ev=>{setForm({...form,supervisor:ev.target.value}); setErrors(s=>({...s,supervisor:undefined}));}, className:inputClass('supervisor')})
+                e('input',{name:'supervisor', type:'text', value:form.supervisor, onChange:ev=>{setForm({...form,supervisor:ev.target.value}); setErrors(s=>({...s,supervisor:undefined}));}, className:inputClass('supervisor'), autoComplete:'off'})
               ),
 
               e('div',{className:'md:col-span-2'},
                 e('label',{className:'block text-sm font-medium text-gray-700 mb-1'},'Work Description'),
-                e('textarea',{rows:2,value:form.workDescription,onChange:ev=>setForm({...form,workDescription:ev.target.value}), className:'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500'})
+                e('textarea',{name:'workDescription', rows:2, value:form.workDescription, onChange:ev=>setForm({...form,workDescription:ev.target.value}), className:'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500', autoComplete:'off'})
               ),
               e('div',{className:'md:col-span-2'},
                 e('label',{className:'block text-sm font-medium text-gray-700 mb-1'},'Hazards'),
-                e('textarea',{rows:2,value:form.hazards,onChange:ev=>setForm({...form,hazards:ev.target.value}), className:'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500'})
+                e('textarea',{name:'hazards', rows:2, value:form.hazards, onChange:ev=>setForm({...form,hazards:ev.target.value}), className:'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500', autoComplete:'off'})
               ),
               e('div',{className:'md:col-span-2'},
                 e('label',{className:'block text-sm font-medium text-gray-700 mb-1'},'Control Measures'),
-                e('textarea',{rows:2,value:form.controlMeasures,onChange:ev=>setForm({...form,controlMeasures:ev.target.value}), className:'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500'})
+                e('textarea',{name:'controlMeasures', rows:2, value:form.controlMeasures, onChange:ev=>setForm({...form,controlMeasures:ev.target.value}), className:'w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500', autoComplete:'off'})
               ),
 
               e('div',null,
                 e('label',{className:'block text-sm font-medium text-gray-700 mb-1'},'Permit Issuer'),
-                e('input',{type:'text',value:form.permitIssuer,onChange:ev=>setForm({...form,permitIssuer:ev.target.value}), className:inputClass('permitIssuer')})
+                e('input',{name:'permitIssuer', type:'text', value:form.permitIssuer, onChange:ev=>setForm({...form,permitIssuer:ev.target.value}), className:inputClass('permitIssuer'), autoComplete:'off'})
               ),
 
               e('div',null,
                 e('label',{className:'block text-sm font-medium text-gray-700 mb-1'},'Status'),
-                e('select',{value:form.status,onChange:ev=>setForm({...form,status:ev.target.value}), className:inputClass('status')},
+                e('select',{name:'status', value:form.status, onChange:ev=>setForm({...form,status:ev.target.value}), className:inputClass('status')},
                   e('option',{value:'Active'},'Active'),
                   e('option',{value:'Closed'},'Closed'),
                   e('option',{value:'Suspended'},'Suspended')
@@ -337,11 +354,11 @@
 
               e('div',null,
                 e('label',{className:'block text-sm font-medium text-gray-700 mb-1'},'Valid From'),
-                e('input',{type:'datetime-local',value:form.validFrom,onChange:ev=>setForm({...form,validFrom:ev.target.value}), className:inputClass('validFrom')})
+                e('input',{name:'validFrom', type:'datetime-local', value:form.validFrom, onChange:ev=>setForm({...form,validFrom:ev.target.value}), className:inputClass('validFrom')})
               ),
               e('div',null,
                 e('label',{className:'block text-sm font-medium text-gray-700 mb-1'},'Valid To'),
-                e('input',{type:'datetime-local',value:form.validTo,onChange:ev=>setForm({...form,validTo:ev.target.value}), className:inputClass('validTo')})
+                e('input',{name:'validTo', type:'datetime-local', value:form.validTo, onChange:ev=>setForm({...form,validTo:ev.target.value}), className:inputClass('validTo')})
               )
             ),
             e('div',{className:'flex gap-3 justify-end'},
@@ -368,6 +385,7 @@
                     e('thead',{className:'bg-gray-50'},
                       e('tr',null, ['Date','Time','Permit No.','Permit Type','Location','Contractor','Supervisor','Status']
                         .map(h => e('th',{key:h,className:'px-4 py-3 text-left text-sm font-semibold text-gray-700'},h)))),
+
                     e('tbody',{className:'divide-y divide-gray-200'},
                       permits.map(p => e('tr',{key:p.id,className:'hover:bg-gray-50'},
                         e('td',{className:'px-4 py-3 text-sm text-gray-800'},p.date),
@@ -383,6 +401,7 @@
                           e('span',{className: p.status==='Active' ? 'font-semibold text-green-600' : 'font-semibold text-gray-500'}, p.status)
                         )
                       )))
+
                   )
                 )
           )
