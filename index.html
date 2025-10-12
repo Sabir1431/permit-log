@@ -37,12 +37,14 @@
       // keys must match the server's SHEET_IDS/TAB_NAMES
       const projects = ['TWS O-16123', 'TW O-16124'];
 
-      const permitTypes = [
-        { id: 'confined-space', name: 'SOF-3542-I Confined Space Entry' },
-        { id: 'excavation',     name: 'SOF-3542-H Excavation' },
-        { id: 'work-height',    name: 'SOF-3542-E Work at Height' },
-        { id: 'lifting',        name: 'SOF-3542-C Lifting Operation' }
-      ];
+     const permitTypes = [
+  { id: 'confined-space', name: 'SOF-3542-I Confined Space Entry' },
+  { id: 'excavation',     name: 'SOF-3542-H Excavation' },
+  { id: 'work-height',    name: 'SOF-3542-E Work at Height' },
+  { id: 'lifting',        name: 'SOF-3542-C Lifting Operation' },
+  { id: 'hot-work',       name: 'SOF-3542-B Hot Work Permit' } // 🔥 added new permit type
+];
+
 
       const [form, setForm] = useState({
         date: new Date().toISOString().split('T')[0],
@@ -218,12 +220,14 @@
         return permits.filter(p => (p.permitTypeName || '').toLowerCase().includes(label.toLowerCase())).length;
       }
 
-      const statCards = [
-        { key: 'confined', label: 'Confined Space Entry', color: 'bg-blue-100 border-blue-300',    count: () => countTypeContains('confined')  },
-        { key: 'excav',    label: 'Excavation',           color: 'bg-green-100 border-green-300', count: () => countTypeContains('excavation') },
-        { key: 'height',   label: 'Work at Height',       color: 'bg-yellow-100 border-yellow-300', count: () => countTypeContains('height')   },
-        { key: 'lifting',  label: 'Lifting Operation',    color: 'bg-purple-100 border-purple-300', count: () => countTypeContains('lifting')  }
-      ];
+     const statCards = [
+  { key: 'confined', label: 'Confined Space Entry', color: 'bg-blue-100 border-blue-300',    count: () => countTypeContains('confined')  },
+  { key: 'excav',    label: 'Excavation',           color: 'bg-green-100 border-green-300', count: () => countTypeContains('excavation') },
+  { key: 'height',   label: 'Work at Height',       color: 'bg-yellow-100 border-yellow-300', count: () => countTypeContains('height')   },
+  { key: 'lifting',  label: 'Lifting Operation',    color: 'bg-purple-100 border-purple-300', count: () => countTypeContains('lifting')  },
+  { key: 'hotwork',  label: 'Hot Work Permit',      color: 'bg-red-100 border-red-300',       count: () => countTypeContains('hot work') } // 🔥 new card
+];
+
 
       return e('div', { className: 'min-h-screen p-6' },
         e('div', { className: 'max-w-7xl mx-auto' },
