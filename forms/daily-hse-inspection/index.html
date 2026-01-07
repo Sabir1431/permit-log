@@ -682,42 +682,78 @@
             resizeCanvas(); // Initial canvas resize
 
             // Form Submission (Placeholder)
-            hseReportForm.addEventListener('submit', (event) => {
-                event.preventDefault(); // Prevent default form submission
+            hseReportForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
 
-                // Ensure signature data is captured if the canvas is not empty
-                if (!signatureDataInput.value && !isCanvasEmpty(signaturePadCanvas)) {
-                    const dataURL = signaturePadCanvas.toDataURL();
-                    signatureDataInput.value = dataURL;
-                    signaturePreview.src = dataURL;
-                    signaturePreview.classList.remove('hidden');
-                }
+  // If signature exists on canvas but not saved, capture it
+  if (!signatureDataInput.value && !isCanvasEmpty(signaturePadCanvas)) {
+    signatureDataInput.value = signaturePadCanvas.toDataURL("image/png");
+  }
 
-                const formData = new FormData(hseReportForm);
-                const data = {};
+  const formData = new FormData(hseReportForm);
 
-                for (let [key, value] of formData.entries()) {
-                    if (key.startsWith('photoUpload-')) {
-                        // For files, store just the file name or base64 if needed
-                        if (value instanceof File) {
-                            data[key] = value.name; // Or convert to Base64 if needed for actual submission
-                            // Example for Base64:
-                            // const reader = new FileReader();
-                            // reader.onload = (e) => { data[key] = e.target.result; };
-                            // reader.readAsDataURL(value);
-                        }
-                    } else if (key === 'signatureData') {
-                        // Store signature as is (Base64)
-                        data[key] = value;
-                    } else {
-                        data[key] = value;
-                    }
-                }
+  // Build payload
+  const payload = {
+    reportDate: formData.get("reportDate"),
+    siteLocation: formData.get("siteLocation"),
+    inspectorName: formData.get("inspectorName"),
+    signatureData: formData.get("signatureData"),
+    checklist: {},
+    observations: [],
+    photos: []
+  };
 
-                console.log('Submitted Data:', data);
-                alert('HSE Report submitted successfully! Check console for data.');
-            });
-        });
+  // Checklist (read all radio + comments)
+  for (const [key, value] of formData.entries()) {
+    if (key.startsWith("checklist-") && !key.endsWith("-comments")) {
+      payload.checklist[key] = { result: value, comments: formData.get(`${key}-comments`) || "" };
+    }
+  }
+
+  // Observations: observation-1, observation-2...
+  for (const [key, value] of formData.entries()) {
+    if (key.startsWith("observation-") && value) payload.observations.push(value);
+  }
+
+  // Photos: photoUpload-1..n and captions
+  const photoEntries = [];
+  for (const [key, value] of formData.entries()) {
+    if (key.startsWith("photoUpload-") && value instanceof File && value.size > 0) {
+      const id = key.split("-")[1];
+      photoEntries.push({ id, file: value });
+    }
+  }
+
+  for (const p of photoEntries) {
+    const dataUrl = await fileToDataUrl(p.file);
+    const caption = formData.get(`photoCaption-${p.id}`) || "";
+    payload.photos.push({ dataUrl, caption });
+  }
+
+  // Optional: store a simple HTML snapshot
+  // (You can improve this later to render a report template)
+  payload.renderedHtml = document.documentElement.outerHTML;
+
+  // TODO: Replace with your deployed Apps Script Web App URL
+  const ENDPOINT_URL = "PASTE_YOUR_APPS_SCRIPT_WEB_APP_URL_HERE";
+
+  const res = await fetch(ENDPOINT_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  const result = await res.json();
+
+  if (result.ok) {
+    alert(`HSE Report saved in Google Drive.\nFolder: ${result.folderName}`);
+    hseReportForm.reset();
+    reportDateInput.valueAsDate = new Date();
+  } else {
+    alert(`Save failed: ${result.message}`);
+  }
+});
+
     </script>
 </body>
 </html>
