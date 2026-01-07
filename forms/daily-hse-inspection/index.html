@@ -59,7 +59,6 @@
     <h1>Daily HSE Inspection Report</h1>
 
     <form id="hseReportForm">
-      <!-- ===================== GENERAL INFO ===================== -->
       <fieldset>
         <legend>General Information</legend>
         <p class="help">This form submits the inspection record to Google Drive under the selected project folder (Year → Site → Report Number).</p>
@@ -121,13 +120,10 @@
           </div>
         </div>
 
-        <!-- Hidden: project folder id (used by Apps Script) -->
         <input type="hidden" id="projectFolderId" name="projectFolderId" />
-        <!-- Hidden: token sent to Apps Script -->
         <input type="hidden" id="apiToken" name="apiToken" />
       </fieldset>
 
-      <!-- ===================== GEOLOCATION ===================== -->
       <fieldset>
         <legend>Geolocation (Optional)</legend>
         <p class="help">Capture GPS coordinates to strengthen evidence packs. If not required, leave blank.</p>
@@ -155,7 +151,6 @@
         </div>
       </fieldset>
 
-      <!-- ===================== CHECKLIST ===================== -->
       <fieldset>
         <legend>Inspection Checklist</legend>
         <p class="help">Select Yes/No/N/A and add comments if required.</p>
@@ -239,7 +234,6 @@
         </div>
       </fieldset>
 
-      <!-- ===================== CORRECTIVE ACTIONS ===================== -->
       <fieldset>
         <legend>Corrective Actions (CAPA)</legend>
         <p class="help">Add corrective actions raised during inspection (Owner + target date + status).</p>
@@ -288,7 +282,6 @@
         </div>
       </fieldset>
 
-      <!-- ===================== PHOTO EVIDENCE ===================== -->
       <fieldset>
         <legend>Photo Evidence</legend>
         <p class="help">Upload photos (non-compliance, housekeeping, barricading, permits, etc.).</p>
@@ -318,7 +311,6 @@
         </div>
       </fieldset>
 
-      <!-- ===================== OBSERVATIONS ===================== -->
       <fieldset>
         <legend>Observations</legend>
         <p class="help">Record any observations, positive findings, or concerns.</p>
@@ -338,7 +330,6 @@
         </div>
       </fieldset>
 
-      <!-- ===================== SIGNATURE ===================== -->
       <fieldset>
         <legend>Inspector Signature</legend>
         <p class="help">Sign using mouse or touch. The signature is stored in Drive as signature.png.</p>
@@ -457,10 +448,7 @@ document.addEventListener('DOMContentLoaded', () => {
   reportDateInput.valueAsDate = new Date();
   generateReportNumber();
 
-  reportDateInput.addEventListener('change', () => {
-    // Regenerate on date change (helps daily numbering)
-    generateReportNumber();
-  });
+  reportDateInput.addEventListener('change', () => generateReportNumber());
 
   projectNameSelect.addEventListener('change', () => {
     const project = projectNameSelect.value;
@@ -723,7 +711,6 @@ document.addEventListener('DOMContentLoaded', () => {
   hseReportForm.addEventListener('submit', async (event) => {
     event.preventDefault();
 
-    // Validate project selection
     if (!projectNameSelect.value) {
       alert('Please select a project.');
       projectNameSelect.focus();
@@ -731,7 +718,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     projectFolderIdInput.value = PROJECT_FOLDER_MAP[projectNameSelect.value] || '';
 
-    // Capture signature
     if (!signatureDataInput.value && !isCanvasEmpty()) {
       const sig = signaturePadCanvas.toDataURL('image/png');
       signatureDataInput.value = sig;
@@ -741,7 +727,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const formData = new FormData(hseReportForm);
 
-    // Build payload for Apps Script
     const payload = {
       apiToken: API_TOKEN,
       reportNumber: formData.get('reportNumber') || '',
@@ -774,7 +759,6 @@ document.addEventListener('DOMContentLoaded', () => {
       userAgent: navigator.userAgent
     };
 
-    // Checklist + comments
     for (const [key, value] of formData.entries()) {
       if (key.startsWith('checklist-') && !key.endsWith('-comments')) {
         payload.checklist[key] = {
@@ -784,15 +768,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Observations
     for (const [key, value] of formData.entries()) {
       if (key.startsWith('observation-') && value && String(value).trim().length > 0) {
         payload.observations.push(String(value).trim());
       }
     }
 
-    // Corrective actions (CAPA)
-    // We scan based on DOM containers to maintain correct IDs even if removed
     const capaBlocks = Array.from(document.querySelectorAll('[id^="capaContainer-"]'));
     capaBlocks.forEach(block => {
       const id = block.id.split('-')[1];
@@ -802,13 +783,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const status = (document.getElementById(`capaStatus-${id}`)?.value || '').trim();
       const closeoutNotes = (document.getElementById(`capaCloseout-${id}`)?.value || '').trim();
 
-      // Only include if at least action/owner/target/status has something
       if (action || owner || targetDate || status || closeoutNotes) {
         payload.correctiveActions.push({ action, owner, targetDate, status, closeoutNotes });
       }
     });
 
-    // Photos: file -> Base64 + caption
     const photoUploads = [];
     for (const [key, value] of formData.entries()) {
       if (key.startsWith('photoUpload-') && value instanceof File && value.size > 0) {
@@ -827,24 +806,14 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
 
-    // Optional: HTML snapshot (for traceability)
     payload.renderedHtml = document.documentElement.outerHTML;
 
-    const postJson = async (useNoCors=false) => {
-      const options = {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-API-TOKEN': API_TOKEN
-        },
-        body: JSON.stringify(payload)
-      };
-      if (useNoCors) options.mode = 'no-cors';
-      return fetch(ENDPOINT_URL, options);
-    };
-
     try {
-      const res = await postJson(false);
+      const res = await fetch(ENDPOINT_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
 
       let result = null;
       try { result = await res.json(); } catch (_) {}
@@ -854,7 +823,6 @@ document.addEventListener('DOMContentLoaded', () => {
         hseReportForm.reset();
         reportDateInput.valueAsDate = new Date();
         generateReportNumber();
-        projectFolderIdInput.value = PROJECT_FOLDER_MAP[projectNameSelect.value] || '';
         apiTokenInput.value = API_TOKEN;
         clearSignatureBtn.click();
         geoLat.value = ''; geoLng.value = ''; geoAcc.value = '';
@@ -862,18 +830,12 @@ document.addEventListener('DOMContentLoaded', () => {
       } else if (result && result.ok === false) {
         alert(`Save failed: ${result.message || 'Unknown error'}`);
       } else {
-        alert('Submitted. If no confirmation appears, verify Web App access / CORS settings and check the Drive folder.');
+        alert('Submitted. Please verify the report folder in Google Drive.');
       }
 
     } catch (err) {
-      console.warn('Primary POST failed; attempting no-cors:', err);
-      try {
-        await postJson(true);
-        alert('Submitted (no-cors). Please verify the report folder in Google Drive.');
-      } catch (err2) {
-        console.error(err2);
-        alert('Submission failed. Check endpoint URL, Web App access, and internet connection.');
-      }
+      console.error(err);
+      alert('Submission failed. Check endpoint URL, Web App access, and internet connection.');
     }
   });
 });
