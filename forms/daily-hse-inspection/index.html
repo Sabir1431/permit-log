@@ -809,34 +809,30 @@ document.addEventListener('DOMContentLoaded', () => {
     payload.renderedHtml = document.documentElement.outerHTML;
 
     try {
-      const res = await fetch(ENDPOINT_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+  const res = await fetch(ENDPOINT_URL, {
+    method: 'POST',
+    redirect: 'follow',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload)
+  });
 
-      let result = null;
-      try { result = await res.json(); } catch (_) {}
+  const text = await res.text();
+  console.log("HTTP Status:", res.status);
+  console.log("Response:", text);
 
-      if (result && result.ok) {
-        alert(`Saved to Google Drive.\nReport: ${result.reportNumber}\nFolder ID: ${result.folderId}`);
-        hseReportForm.reset();
-        reportDateInput.valueAsDate = new Date();
-        generateReportNumber();
-        apiTokenInput.value = API_TOKEN;
-        clearSignatureBtn.click();
-        geoLat.value = ''; geoLng.value = ''; geoAcc.value = '';
-        hide(geoOk); hide(geoErr); hide(geoStatus);
-      } else if (result && result.ok === false) {
-        alert(`Save failed: ${result.message || 'Unknown error'}`);
-      } else {
-        alert('Submitted. Please verify the report folder in Google Drive.');
-      }
+  let result = null;
+  try { result = JSON.parse(text); } catch (e) {}
 
-    } catch (err) {
-      console.error(err);
-      alert('Submission failed. Check endpoint URL, Web App access, and internet connection.');
-    }
+  if (result && result.ok) {
+    alert(`Saved to Google Drive.\nReport: ${result.reportNumber}\nFolder ID: ${result.folderId}`);
+  } else {
+    alert(`Save failed.\nHTTP: ${res.status}\nResponse: ${text}`);
+  }
+} catch (err) {
+  console.error("Network error:", err);
+  alert("Submission failed (network/CORS). Open Console (F12) and check the error details.");
+}
+
   });
 });
 </script>
