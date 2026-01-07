@@ -367,7 +367,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // =========================================================
 
   // Your Google Apps Script Web App /exec URL
-  const ENDPOINT_URL = 'https://script.google.com/macros/s/AKfycbxRm8asg1KLaRKeIYaoEn2LsgqQXAzHgJT4iWYEafnT_hy2Z5U7lbPhyQhziHqULyIZoQ/exec';
+  const ENDPOINT_URL = 'https://script.google.com/macros/s/AKfycbzeVg3EQulMdoK9AewmuzQ9NseNeDkBE6T8x-GYyZxV6lj99ZaG0FFFoj0u377widkDOQ/exec';
 
   // Same token as in Apps Script (API_TOKEN)
   const API_TOKEN = 'HSE-TAQA-2026-SECURE-KEY-98321';
@@ -758,7 +758,7 @@ document.addEventListener('DOMContentLoaded', () => {
   hseReportForm.addEventListener('submit', async (event) => {
     event.preventDefault();
 
-    if (!ENDPOINT_URL || ENDPOINT_URL.includes('https://script.google.com/macros/s/AKfycbxRm8asg1KLaRKeIYaoEn2LsgqQXAzHgJT4iWYEafnT_hy2Z5U7lbPhyQhziHqULyIZoQ/exec')) {
+    if (!ENDPOINT_URL || ENDPOINT_URL.includes('https://script.google.com/macros/s/AKfycbzeVg3EQulMdoK9AewmuzQ9NseNeDkBE6T8x-GYyZxV6lj99ZaG0FFFoj0u377widkDOQ/exec')) {
       alert("Please set ENDPOINT_URL in the HTML to your Apps Script /exec URL.");
       return;
     }
