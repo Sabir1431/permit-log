@@ -1,14 +1,8 @@
 /**
  * HSE Inspection Web App (Drive + Word Export)
- * - doPost: saves payload to Drive (same as your current flow)
- * - NEW: /exec?mode=export&folderId=...  OR POST { mode:"export", folderId:"..." }
- * - Generates Google Doc report from report.json + images in the same folder
- * - Exports as DOCX into the same folder
- *
- * DEPLOY:
- * - Execute as: Me (USER_DEPLOYING)
- * - Access: Anyone
- * - After adding Documents scope: Run testAuthorize_() then Deploy NEW VERSION
+ * - doPost: saves payload to Drive
+ * - doGet:  ?mode=export&folderId=...  creates Google Doc + exports DOCX into same folder
+ * - Optional: AUTO_EXPORT_DOCX_AFTER_SAVE can export immediately after save
  */
 
 // ===========================
@@ -22,6 +16,9 @@ const PROJECT_FOLDERS = {
 const API_TOKEN = "HSE-TAQA-2026-SECURE-KEY-98321";
 const ALLOW_NO_TOKEN_FOR_TESTING = false;
 const ALLOWED_DOMAIN = ""; // keep "" to disable
+
+// If true, after saving report.json + photos, the server will also generate DOCX immediately.
+const AUTO_EXPORT_DOCX_AFTER_SAVE = false;
 
 // ===========================
 // ENTRY POINTS
@@ -62,7 +59,7 @@ function doPost(e) {
 
     const payload = JSON.parse(e.postData.contents);
 
-    // Optional: allow POST export
+    // Allow POST export call too (optional)
     if (String(payload.mode || "").toLowerCase() === "export") {
       const tokenOk = validateToken_(payload);
       if (!tokenOk.ok) return jsonResponse_(tokenOk, tokenOk.statusCode);
@@ -110,7 +107,9 @@ function doPost(e) {
     const inspectorName = sanitize_(payload.inspectorName || "Unknown_Inspector");
     const reportNumber = sanitize_(payload.reportNumber || buildReportNumber_(reportDate));
 
-    // Resolve project root folder id
+    // ---------------------------
+    // RESOLVE PROJECT ROOT FOLDER ID
+    // ---------------------------
     const projectFolderId = folderIdFromForm || PROJECT_FOLDERS[projectName];
     if (!projectFolderId) {
       return jsonResponse_({
@@ -120,13 +119,17 @@ function doPost(e) {
       }, 400);
     }
 
-    // Create structure
+    // ---------------------------
+    // CREATE STRUCTURE
+    // ---------------------------
     const projectRoot = safeGetFolderById_(projectFolderId, "ProjectRoot");
     const yearFolder = getOrCreateFolderIn_(projectRoot, year);
     const siteFolder = getOrCreateFolderIn_(yearFolder, siteLocation);
     const recordFolder = getOrCreateFolderIn_(siteFolder, reportNumber);
 
-    // Save payload
+    // ---------------------------
+    // SAVE MAIN JSON + FILES
+    // ---------------------------
     payload._server = {
       savedAt: new Date().toISOString(),
       savedBy: safeActiveUserEmail_(),
@@ -141,13 +144,11 @@ function doPost(e) {
       recordFolder.createFile("report.html", String(payload.renderedHtml), MimeType.HTML);
     }
 
-    // signature
     if (payload.signatureData && String(payload.signatureData).startsWith("data:image")) {
       const sigBlob = dataUrlToBlob_(payload.signatureData, "signature.png");
       recordFolder.createFile(sigBlob);
     }
 
-    // photos
     if (Array.isArray(payload.photos) && payload.photos.length > 0) {
       payload.photos.forEach((p, idx) => {
         if (!p || !p.dataUrl || !String(p.dataUrl).startsWith("data:image")) return;
@@ -167,7 +168,6 @@ function doPost(e) {
       });
     }
 
-    // summary
     const summary = buildSummaryText_(payload, {
       projectName,
       reportNumber,
@@ -177,13 +177,25 @@ function doPost(e) {
     });
     recordFolder.createFile("summary.txt", summary, MimeType.PLAIN_TEXT);
 
+    // ---------------------------
+    // OPTIONAL AUTO EXPORT DOCX
+    // ---------------------------
+    let exportResult = null;
+    if (AUTO_EXPORT_DOCX_AFTER_SAVE) {
+      exportResult = createAndExportWordReport_(recordFolder.getId());
+    }
+
+    // ---------------------------
+    // RESPONSE
+    // ---------------------------
     return jsonResponse_({
       ok: true,
       message: "Saved to Google Drive",
       projectName,
       reportNumber,
       folderName: recordFolder.getName(),
-      folderId: recordFolder.getId()
+      folderId: recordFolder.getId(),
+      export: exportResult // null unless AUTO_EXPORT_DOCX_AFTER_SAVE=true
     }, 200);
 
   } catch (err) {
@@ -198,18 +210,14 @@ function doPost(e) {
 function createAndExportWordReport_(recordFolderId) {
   assertDriveAppAvailable_();
 
-  // Ensure DocumentApp is available
   if (typeof DocumentApp === "undefined" || !DocumentApp) {
-    throw new Error("DocumentApp is not available. Ensure Documents scope is added and you redeployed a NEW VERSION.");
+    throw new Error("DocumentApp is not available. Add documents scope + run testAuthorize_() + deploy NEW VERSION.");
   }
 
   const recordFolder = safeGetFolderById_(recordFolderId, "RecordFolder");
 
-  // Load report.json
   const reportFile = findFirstFileByName_(recordFolder, "report.json");
-  if (!reportFile) {
-    throw new Error("report.json not found in the record folder. Cannot generate report.");
-  }
+  if (!reportFile) throw new Error("report.json not found in the record folder. Cannot generate report.");
 
   const payload = JSON.parse(reportFile.getBlob().getDataAsString("UTF-8"));
 
@@ -227,17 +235,13 @@ function createAndExportWordReport_(recordFolderId) {
     geo: payload.geolocation || {}
   };
 
-  // Create Google Doc
   const docTitle = `HSE Inspection Report - ${meta.reportNumber}`;
   const doc = DocumentApp.create(docTitle);
   const docId = doc.getId();
-
   const body = doc.getBody();
   body.clear();
 
-  // Header
-  const title = body.appendParagraph("DAILY HSE INSPECTION REPORT");
-  title.setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  body.appendParagraph("DAILY HSE INSPECTION REPORT").setHeading(DocumentApp.ParagraphHeading.HEADING1);
 
   body.appendParagraph(`Report No: ${meta.reportNumber}`);
   body.appendParagraph(`Date: ${meta.reportDate}`);
@@ -251,7 +255,6 @@ function createAndExportWordReport_(recordFolderId) {
   body.appendParagraph(`Inspector: ${meta.inspectorName}`);
   body.appendParagraph("");
 
-  // Geolocation
   if (meta.geo && meta.geo.lat && meta.geo.lng) {
     body.appendParagraph("GEOLOCATION").setHeading(DocumentApp.ParagraphHeading.HEADING2);
     body.appendParagraph(`Latitude: ${meta.geo.lat}`);
@@ -260,7 +263,6 @@ function createAndExportWordReport_(recordFolderId) {
     body.appendParagraph("");
   }
 
-  // Checklist
   body.appendParagraph("INSPECTION CHECKLIST").setHeading(DocumentApp.ParagraphHeading.HEADING2);
   const checklist = payload.checklist || {};
   const checklistKeys = Object.keys(checklist);
@@ -271,17 +273,14 @@ function createAndExportWordReport_(recordFolderId) {
     const table = body.appendTable([["Item", "Result", "Comments"]]);
     checklistKeys.forEach(k => {
       const item = checklist[k] || {};
-      table.appendTableRow()
-        .appendTableCell(String(k))
-        .getParentRow()
-        .appendTableCell(String(item.result || ""))
-        .getParentRow()
-        .appendTableCell(String(item.comments || ""));
+      const row = table.appendTableRow();
+      row.appendTableCell(String(k));
+      row.appendTableCell(String(item.result || ""));
+      row.appendTableCell(String(item.comments || ""));
     });
   }
   body.appendParagraph("");
 
-  // Observations
   body.appendParagraph("OBSERVATIONS").setHeading(DocumentApp.ParagraphHeading.HEADING2);
   if (Array.isArray(payload.observations) && payload.observations.length > 0) {
     payload.observations.forEach((o, i) => body.appendListItem(`${i + 1}. ${String(o).trim()}`));
@@ -290,7 +289,6 @@ function createAndExportWordReport_(recordFolderId) {
   }
   body.appendParagraph("");
 
-  // Corrective Actions
   body.appendParagraph("CORRECTIVE ACTIONS (CAPA)").setHeading(DocumentApp.ParagraphHeading.HEADING2);
   if (Array.isArray(payload.correctiveActions) && payload.correctiveActions.length > 0) {
     const t = body.appendTable([["Action", "Owner", "Target Date", "Status", "Closeout Notes"]]);
@@ -307,19 +305,22 @@ function createAndExportWordReport_(recordFolderId) {
   }
   body.appendParagraph("");
 
-  // Evidence: Photos
   body.appendParagraph("PHOTO EVIDENCE").setHeading(DocumentApp.ParagraphHeading.HEADING2);
+  const photos = listFilesByPrefix_(recordFolder, "photo_")
+    .filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f.getName()));
 
-  const photos = listFilesByPrefix_(recordFolder, "photo_");
   if (photos.length === 0) {
     body.appendParagraph("No photos uploaded.");
   } else {
     photos.forEach(file => {
       const blob = file.getBlob();
       const img = body.appendImage(blob);
-      img.setWidth(520); // fits A4 nicely in DOC
+      img.setWidth(520);
+
       body.appendParagraph(file.getName());
-      const captionFile = findFirstFileByName_(recordFolder, file.getName().replace(/\.(jpg|jpeg|png|webp)$/i, "_caption.txt"));
+
+      const captionName = file.getName().replace(/\.(jpg|jpeg|png|webp)$/i, "_caption.txt");
+      const captionFile = findFirstFileByName_(recordFolder, captionName);
       if (captionFile) {
         body.appendParagraph("Caption: " + captionFile.getBlob().getDataAsString("UTF-8"));
       }
@@ -327,7 +328,6 @@ function createAndExportWordReport_(recordFolderId) {
     });
   }
 
-  // Signature
   body.appendParagraph("INSPECTOR SIGNATURE").setHeading(DocumentApp.ParagraphHeading.HEADING2);
   const sig = findFirstFileByName_(recordFolder, "signature.png");
   if (sig) {
@@ -342,11 +342,11 @@ function createAndExportWordReport_(recordFolderId) {
 
   doc.saveAndClose();
 
-  // Move Doc into the record folder
+  // Move Doc into record folder
   const docFile = DriveApp.getFileById(docId);
   recordFolder.addFile(docFile);
 
-  // Export to DOCX and save into same folder
+  // Export DOCX into same folder
   const exportBlob = docFile.getBlob().getAs(MimeType.MICROSOFT_WORD);
   const docxName = `${docTitle}.docx`;
   const docxFile = recordFolder.createFile(exportBlob.setName(docxName));
@@ -366,10 +366,11 @@ function createAndExportWordReport_(recordFolderId) {
 
 function testAuthorize_() {
   assertDriveAppAvailable_();
-  // Touch Drive & Document scopes
-  const root = DriveApp.getRootFolder().getName();
-  Logger.log("Drive OK. Root: " + root);
 
+  // Touch Drive
+  Logger.log("Drive OK. Root: " + DriveApp.getRootFolder().getName());
+
+  // Touch Docs
   const d = DocumentApp.create("AUTH_TEST_HSE_DOC_" + new Date().toISOString().replace(/[:.]/g, "_"));
   Logger.log("Document OK. DocId: " + d.getId());
   DriveApp.getFileById(d.getId()).setTrashed(true);
@@ -418,10 +419,6 @@ function safeGetFolderById_(folderId, label) {
   }
 }
 
-// ===========================
-// FILE HELPERS
-// ===========================
-
 function findFirstFileByName_(folder, name) {
   const it = folder.getFilesByName(name);
   return it.hasNext() ? it.next() : null;
@@ -437,10 +434,6 @@ function listFilesByPrefix_(folder, prefix) {
   files.sort((a, b) => a.getName().localeCompare(b.getName()));
   return files;
 }
-
-// ===========================
-// OTHER HELPERS
-// ===========================
 
 function jsonResponse_(obj, statusCode) {
   const body = { statusCode: statusCode || 200, ...obj };
@@ -481,7 +474,7 @@ function guessExt_(dataUrl) {
   if (mime.includes("jpeg") || mime.includes("jpg")) return "jpg";
   if (mime.includes("png")) return "png";
   if (mime.includes("webp")) return "webp";
-  return "png";
+  return "pngpng";
 }
 
 function buildReportNumber_(reportDate) {
