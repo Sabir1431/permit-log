@@ -1,13 +1,22 @@
 /**
- * HSE Inspection Web App (Drive + Word Export)
- * - doPost: saves payload to Drive
- * - doGet:  ?mode=export&folderId=...  creates Google Doc + exports DOCX into same folder
- * - Optional: AUTO_EXPORT_DOCX_AFTER_SAVE can export immediately after save
+ * HSE Inspection Web App (Drive + Word Export) - FULL CODE
+ * - doPost: saves payload to Drive (report.json, report.html, photos, signature, summary)
+ * - doGet:  ?mode=export&folderId=...  generates Google Doc from report.json + images and exports DOCX to same folder
+ *
+ * DEPLOY:
+ * - Deploy as: Web App
+ * - Execute as: Me (USER_DEPLOYING)
+ * - Access: Anyone
+ *
+ * AFTER CHANGES:
+ * 1) Run testAuthorize_() once in the Apps Script editor
+ * 2) Deploy -> Manage deployments -> Edit -> NEW VERSION -> Update
  */
 
 // ===========================
 // CONFIGURATION
 // ===========================
+
 const PROJECT_FOLDERS = {
   "TAQA WS O-16123": "1gMRc-OhcScKCDz5Z4xRI3Ba49if8pQBC",
   "TAQA WS O-16124": "1A7rrudDh4KBd6c6DsiA0bnCe7PtDx7mF"
@@ -15,9 +24,9 @@ const PROJECT_FOLDERS = {
 
 const API_TOKEN = "HSE-TAQA-2026-SECURE-KEY-98321";
 const ALLOW_NO_TOKEN_FOR_TESTING = false;
-const ALLOWED_DOMAIN = ""; // keep "" to disable
+const ALLOWED_DOMAIN = ""; // e.g. "hydropower.ae" (keep "" to disable)
 
-// If true, after saving report.json + photos, the server will also generate DOCX immediately.
+// If true: after save, server also generates DOCX immediately (slower response time).
 const AUTO_EXPORT_DOCX_AFTER_SAVE = false;
 
 // ===========================
@@ -59,7 +68,7 @@ function doPost(e) {
 
     const payload = JSON.parse(e.postData.contents);
 
-    // Allow POST export call too (optional)
+    // Optional: allow POST export requests too
     if (String(payload.mode || "").toLowerCase() === "export") {
       const tokenOk = validateToken_(payload);
       if (!tokenOk.ok) return jsonResponse_(tokenOk, tokenOk.statusCode);
@@ -140,15 +149,18 @@ function doPost(e) {
 
     recordFolder.createFile("report.json", JSON.stringify(payload, null, 2), MimeType.JSON);
 
+    // Optional HTML snapshot
     if (payload.renderedHtml && String(payload.renderedHtml).trim().length > 0) {
       recordFolder.createFile("report.html", String(payload.renderedHtml), MimeType.HTML);
     }
 
+    // Signature
     if (payload.signatureData && String(payload.signatureData).startsWith("data:image")) {
       const sigBlob = dataUrlToBlob_(payload.signatureData, "signature.png");
       recordFolder.createFile(sigBlob);
     }
 
+    // Photos
     if (Array.isArray(payload.photos) && payload.photos.length > 0) {
       payload.photos.forEach((p, idx) => {
         if (!p || !p.dataUrl || !String(p.dataUrl).startsWith("data:image")) return;
@@ -168,6 +180,7 @@ function doPost(e) {
       });
     }
 
+    // Summary
     const summary = buildSummaryText_(payload, {
       projectName,
       reportNumber,
@@ -216,6 +229,7 @@ function createAndExportWordReport_(recordFolderId) {
 
   const recordFolder = safeGetFolderById_(recordFolderId, "RecordFolder");
 
+  // Load report.json
   const reportFile = findFirstFileByName_(recordFolder, "report.json");
   if (!reportFile) throw new Error("report.json not found in the record folder. Cannot generate report.");
 
@@ -235,12 +249,14 @@ function createAndExportWordReport_(recordFolderId) {
     geo: payload.geolocation || {}
   };
 
+  // Create Google Doc
   const docTitle = `HSE Inspection Report - ${meta.reportNumber}`;
   const doc = DocumentApp.create(docTitle);
   const docId = doc.getId();
   const body = doc.getBody();
   body.clear();
 
+  // Header
   body.appendParagraph("DAILY HSE INSPECTION REPORT").setHeading(DocumentApp.ParagraphHeading.HEADING1);
 
   body.appendParagraph(`Report No: ${meta.reportNumber}`);
@@ -255,6 +271,7 @@ function createAndExportWordReport_(recordFolderId) {
   body.appendParagraph(`Inspector: ${meta.inspectorName}`);
   body.appendParagraph("");
 
+  // Geolocation
   if (meta.geo && meta.geo.lat && meta.geo.lng) {
     body.appendParagraph("GEOLOCATION").setHeading(DocumentApp.ParagraphHeading.HEADING2);
     body.appendParagraph(`Latitude: ${meta.geo.lat}`);
@@ -263,6 +280,7 @@ function createAndExportWordReport_(recordFolderId) {
     body.appendParagraph("");
   }
 
+  // Checklist
   body.appendParagraph("INSPECTION CHECKLIST").setHeading(DocumentApp.ParagraphHeading.HEADING2);
   const checklist = payload.checklist || {};
   const checklistKeys = Object.keys(checklist);
@@ -281,6 +299,7 @@ function createAndExportWordReport_(recordFolderId) {
   }
   body.appendParagraph("");
 
+  // Observations
   body.appendParagraph("OBSERVATIONS").setHeading(DocumentApp.ParagraphHeading.HEADING2);
   if (Array.isArray(payload.observations) && payload.observations.length > 0) {
     payload.observations.forEach((o, i) => body.appendListItem(`${i + 1}. ${String(o).trim()}`));
@@ -289,6 +308,7 @@ function createAndExportWordReport_(recordFolderId) {
   }
   body.appendParagraph("");
 
+  // Corrective Actions
   body.appendParagraph("CORRECTIVE ACTIONS (CAPA)").setHeading(DocumentApp.ParagraphHeading.HEADING2);
   if (Array.isArray(payload.correctiveActions) && payload.correctiveActions.length > 0) {
     const t = body.appendTable([["Action", "Owner", "Target Date", "Status", "Closeout Notes"]]);
@@ -305,7 +325,9 @@ function createAndExportWordReport_(recordFolderId) {
   }
   body.appendParagraph("");
 
+  // Photos
   body.appendParagraph("PHOTO EVIDENCE").setHeading(DocumentApp.ParagraphHeading.HEADING2);
+
   const photos = listFilesByPrefix_(recordFolder, "photo_")
     .filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f.getName()));
 
@@ -315,7 +337,7 @@ function createAndExportWordReport_(recordFolderId) {
     photos.forEach(file => {
       const blob = file.getBlob();
       const img = body.appendImage(blob);
-      img.setWidth(520);
+      img.setWidth(520); // A4-friendly width
 
       body.appendParagraph(file.getName());
 
@@ -328,6 +350,7 @@ function createAndExportWordReport_(recordFolderId) {
     });
   }
 
+  // Signature
   body.appendParagraph("INSPECTOR SIGNATURE").setHeading(DocumentApp.ParagraphHeading.HEADING2);
   const sig = findFirstFileByName_(recordFolder, "signature.png");
   if (sig) {
@@ -342,11 +365,11 @@ function createAndExportWordReport_(recordFolderId) {
 
   doc.saveAndClose();
 
-  // Move Doc into record folder
+  // Move Doc into the record folder
   const docFile = DriveApp.getFileById(docId);
   recordFolder.addFile(docFile);
 
-  // Export DOCX into same folder
+  // Export to DOCX and save into same folder
   const exportBlob = docFile.getBlob().getAs(MimeType.MICROSOFT_WORD);
   const docxName = `${docTitle}.docx`;
   const docxFile = recordFolder.createFile(exportBlob.setName(docxName));
@@ -366,11 +389,8 @@ function createAndExportWordReport_(recordFolderId) {
 
 function testAuthorize_() {
   assertDriveAppAvailable_();
-
-  // Touch Drive
   Logger.log("Drive OK. Root: " + DriveApp.getRootFolder().getName());
 
-  // Touch Docs
   const d = DocumentApp.create("AUTH_TEST_HSE_DOC_" + new Date().toISOString().replace(/[:.]/g, "_"));
   Logger.log("Document OK. DocId: " + d.getId());
   DriveApp.getFileById(d.getId()).setTrashed(true);
@@ -419,6 +439,10 @@ function safeGetFolderById_(folderId, label) {
   }
 }
 
+// ===========================
+// FILE HELPERS
+// ===========================
+
 function findFirstFileByName_(folder, name) {
   const it = folder.getFilesByName(name);
   return it.hasNext() ? it.next() : null;
@@ -435,9 +459,15 @@ function listFilesByPrefix_(folder, prefix) {
   return files;
 }
 
+// ===========================
+// OTHER HELPERS
+// ===========================
+
 function jsonResponse_(obj, statusCode) {
   const body = { statusCode: statusCode || 200, ...obj };
-  return ContentService.createTextOutput(JSON.stringify(body)).setMimeType(ContentService.MimeType.JSON);
+  return ContentService
+    .createTextOutput(JSON.stringify(body))
+    .setMimeType(ContentService.MimeType.JSON);
 }
 
 function safeActiveUserEmail_() {
@@ -454,7 +484,11 @@ function getOrCreateFolderIn_(parentFolder, name) {
 }
 
 function sanitize_(value) {
-  return String(value).trim().replace(/[\/\\:*?"<>|]/g, "_").replace(/\s+/g, " ").substring(0, 120);
+  return String(value)
+    .trim()
+    .replace(/[\/\\:*?"<>|]/g, "_")
+    .replace(/\s+/g, " ")
+    .substring(0, 120);
 }
 
 function dataUrlToBlob_(dataUrl, filename) {
@@ -474,7 +508,7 @@ function guessExt_(dataUrl) {
   if (mime.includes("jpeg") || mime.includes("jpg")) return "jpg";
   if (mime.includes("png")) return "png";
   if (mime.includes("webp")) return "webp";
-  return "pngpng";
+  return "png";
 }
 
 function buildReportNumber_(reportDate) {
@@ -493,6 +527,52 @@ function buildSummaryText_(payload, meta) {
   lines.push(`Site/Area: ${meta.siteLocation}`);
   lines.push(`Inspector: ${meta.inspectorName}`);
   lines.push("");
+
+  if (payload.workOrder) lines.push(`Work Order: ${payload.workOrder}`);
+  if (payload.permitNo) lines.push(`Permit No: ${payload.permitNo}`);
+  if (payload.supervisorName) lines.push(`Supervisor: ${payload.supervisorName}`);
+  if (payload.contractorName) lines.push(`Contractor: ${payload.contractorName}`);
+  if (payload.areaLocation) lines.push(`Area Location: ${payload.areaLocation}`);
+  lines.push("");
+
+  if (payload.geolocation && payload.geolocation.lat && payload.geolocation.lng) {
+    lines.push(`Geolocation: ${payload.geolocation.lat}, ${payload.geolocation.lng} (±${payload.geolocation.accuracyM || "?"}m)`);
+    lines.push("");
+  }
+
+  const checklist = payload.checklist || {};
+  const keys = Object.keys(checklist);
+  if (keys.length > 0) {
+    lines.push("Checklist:");
+    keys.forEach(k => {
+      const item = checklist[k] || {};
+      const result = item.result || "";
+      const comments = item.comments ? ` | ${String(item.comments).trim()}` : "";
+      lines.push(`- ${k}: ${result}${comments}`);
+    });
+    lines.push("");
+  }
+
+  if (Array.isArray(payload.observations) && payload.observations.length > 0) {
+    lines.push("Observations:");
+    payload.observations.forEach((o, i) => lines.push(`${i + 1}. ${String(o).trim()}`));
+    lines.push("");
+  }
+
+  if (Array.isArray(payload.correctiveActions) && payload.correctiveActions.length > 0) {
+    lines.push("Corrective Actions:");
+    payload.correctiveActions.forEach((a, i) => {
+      lines.push(`${i + 1}. Action: ${a.action || ""}`);
+      lines.push(`   Owner: ${a.owner || ""} | Target: ${a.targetDate || ""} | Status: ${a.status || ""}`);
+      if (a.closeoutNotes) lines.push(`   Notes: ${a.closeoutNotes}`);
+    });
+    lines.push("");
+  }
+
+  const hasSig = !!payload.signatureData;
+  const photoCount = Array.isArray(payload.photos) ? payload.photos.length : 0;
+  lines.push(`Evidence: Signature=${hasSig ? "Yes" : "No"}, Photos=${photoCount}`);
+
   return lines.join("\n");
 }
 
