@@ -1,22 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Daily HSE Inspection Report</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background:#f4f7f6; color:#333; margin:0; padding:0; line-height:1.6; }
+    .container { max-width: 980px; margin: 2rem auto; padding: 2rem; background: #fff; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,.1); }
+    h1 { font-size: 2.25rem; text-align:center; margin: 0 0 1.5rem; color:#1a73e8; font-weight: 800; }
+    fieldset { border: 1px solid #e6e6e6; border-radius: 10px; padding: 1.25rem; margin-bottom: 1.5rem; background:#fafafa; }
+    legend { font-size: 1.1rem; font-weight: 700; padding: 0 0.5rem; color:#1a73e8; }
+    label { display:block; font-weight:600; margin-bottom:.4rem; color:#444; }
+    input[type="text"], input[type="date"], input[type="number"], textarea, select {
+      width:100%; padding:.75rem; border:1px solid #ccc; border-radius: 8px; box-sizing:border-box; font-size: 1rem;
+      transition: border-color .2s, box-shadow .2s; background:#fff;
+    }
+    input:focus, textarea:focus, select:focus { border-color:#1a73e8; outline:none; box-shadow: 0 0 0 3px rgba(26,115,232,.18); }
+    textarea { min-height: 90px; resize: vertical; }
+    .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .grid3 { display:grid; grid-template-columns: 1fr 1fr 1fr; gap: 1rem; }
+    .help { color:#6b7280; font-size:.85rem; margin:.25rem 0 1rem; }
+    .checklist-item { display:flex; flex-wrap:wrap; align-items:center; gap:.75rem; margin-bottom:1rem; padding: 1rem; background:#fff; border-radius: 10px; border:1px solid #eee; }
+    .checklist-item > .item-label { flex: 1; font-weight: 600; }
+    .radio-group { display:flex; gap: 1rem; }
+    .radio-group label { font-weight: 500; margin:0; display:flex; align-items:center; cursor:pointer; }
+    .radio-group input { margin-right:.35rem; }
+    .checklist-comments { flex-basis: 100%; }
+    .photo-upload-container, .observation-container, .capa-container {
+      border: 1px dashed #cfcfcf; border-radius: 10px; padding: 1rem; margin-bottom: 1rem; background:#fff;
+    }
+    .photo-preview { max-width:100%; height:auto; margin-top:.75rem; border-radius:10px; border:1px solid #ddd; }
+    .signature-pad-container { border:1px solid #ccc; border-radius:10px; background:#fff; padding: 1rem; text-align:center; }
+    #signaturePad { border:1px solid #ddd; border-radius:10px; background:#fdfdfd; cursor: crosshair; width: 100%; height: 220px; }
+    .btn-row { display:flex; justify-content:center; gap: .75rem; flex-wrap: wrap; margin-top: .75rem; }
+    button { padding:.75rem 1.25rem; border:none; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor:pointer; transition: transform .1s, background-color .2s; }
+    button:hover { transform: translateY(-1px); }
+    .primary { background:#1a73e8; color:#fff; }
+    .primary:hover { background:#155cb0; }
+    .secondary { background:#e5e7eb; color:#111827; }
+    .secondary:hover { background:#d1d5db; }
+    .add { background:#16a34a; color:#fff; }
+    .add:hover { background:#15803d; }
+    .remove { background:#dc2626; color:#fff; }
+    .remove:hover { background:#b91c1c; }
+    .hidden { display:none; }
+    .badge { display:inline-flex; align-items:center; gap:.5rem; padding:.4rem .6rem; border-radius: 999px; font-size:.85rem; font-weight: 700; }
+    .badge-ok { background: rgba(22,163,74,.12); color:#166534; }
+    .badge-warn { background: rgba(234,179,8,.14); color:#854d0e; }
+    .badge-bad { background: rgba(220,38,38,.12); color:#7f1d1d; }
+    @media (max-width: 720px) { .grid2,.grid3 { grid-template-columns: 1fr; } .container{ margin:1rem; padding: 1rem; } }
+  </style>
+</head>
+
+<body class="min-h-screen">
+  <div class="container">
+    <h1>Daily HSE Inspection Report</h1>
+
+    <form id="hseReportForm">
+      <fieldset>
+        <legend>General Information</legend>
+        <p class="help">This form submits the inspection record to Google Drive under the selected project folder (Year → Site → Report Number).</p>
+
+        <div class="grid2">
+          <div>
+            <label for="reportNumber">Report Number (Auto)</label>
+            <input type="text" id="reportNumber" name="reportNumber" readonly />
+            <p class="help">Format: HSE-YYYYMMDD-XXXX</p>
+          </div>
+          <div>
+            <label for="reportDate">Date of Inspection</label>
+            <input type="date" id="reportDate" name="reportDate" required />
+          </div>
+        </div>
+
+        <div class="grid2">
+          <div>
+            <label for="projectName">Project</label>
+            <select id="projectName" name="projectName" required>
+              <option value="" disabled selected>Select project</option>
+              <option value="TAQA WS O-16123">TAQA WS O-16123</option>
+              <option value="TAQA WS O-16124">TAQA WS O-16124</option>
+            </select>
+          </div>
+          <div>
+            <label for="siteLocation">Site Location / Package</label>
+            <input type="text" id="siteLocation" name="siteLocation" placeholder="e.g., Bani Yas / WO-82A / MH-29 Area" required />
+          </div>
+        </div>
+
+        <div class="grid3">
+          <div>
+            <label for="areaLocation">Area / Chainage</label>
+            <input type="text" id="areaLocation" name="areaLocation" placeholder="e.g., MH-29/1A to Ext. MH-26" />
+          </div>
+          <div>
+            <label for="workOrder">Work Order</label>
+            <input type="text" id="workOrder" name="workOrder" placeholder="e.g., WO 82A" />
+          </div>
+          <div>
+            <label for="permitNo">Permit No. (PTW)</label>
+            <input type="text" id="permitNo" name="permitNo" placeholder="e.g., PTW-EXC-000123" />
+          </div>
+        </div>
+
+        <div class="grid3">
+          <div>
+            <label for="supervisorName">Supervisor</label>
+            <input type="text" id="supervisorName" name="supervisorName" placeholder="e.g., Site Supervisor name" />
+          </div>
+          <div>
+            <label for="contractorName">Contractor / Subcontractor</label>
+            <input type="text" id="contractorName" name="contractorName" placeholder="e.g., Hydropower / IFG / etc." />
+          </div>
+          <div>
+            <label for="inspectorName">Inspector Name</label>
+            <input type="text" id="inspectorName" name="inspectorName" placeholder="e.g., HSE Officer / Inspector" required />
+          </div>
+        </div>
+
+        <input type="hidden" id="projectFolderId" name="projectFolderId" />
+        <input type="hidden" id="apiToken" name="apiToken" />
+      </fieldset>
+
+      <fieldset>
+        <legend>Geolocation (Optional)</legend>
+        <p class="help">Capture GPS coordinates to strengthen evidence packs. If not required, leave blank.</p>
+
+        <div class="btn-row" style="justify-content:flex-start">
+          <button type="button" id="getLocationBtn" class="secondary">Get Current Location</button>
+          <span id="geoStatus" class="badge badge-warn hidden">Waiting for GPS…</span>
+          <span id="geoOk" class="badge badge-ok hidden">Location captured</span>
+          <span id="geoErr" class="badge badge-bad hidden">Location not available</span>
+        </div>
+
+        <div class="grid3" style="margin-top: .75rem;">
+          <div>
+            <label for="geoLat">Latitude</label>
+            <input type="text" id="geoLat" name="geoLat" readonly />
+          </div>
+          <div>
+            <label for="geoLng">Longitude</label>
+            <input type="text" id="geoLng" name="geoLng" readonly />
+          </div>
+          <div>
+            <label for="geoAcc">Accuracy (m)</label>
+            <input type="text" id="geoAcc" name="geoAcc" readonly />
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Inspection Checklist</legend>
+        <p class="help">Select Yes/No/N/A and add comments if required.</p>
+
+        <div class="checklist-item">
+          <div class="item-label">Personal Protective Equipment (PPE) Used Correctly?</div>
+          <div class="radio-group">
+            <label><input type="radio" name="checklist-ppe" value="Yes" required>Yes</label>
+            <label><input type="radio" name="checklist-ppe" value="No">No</label>
+            <label><input type="radio" name="checklist-ppe" value="N/A">N/A</label>
+          </div>
+          <div class="checklist-comments">
+            <label for="checklist-ppe-comments">Comments</label>
+            <textarea id="checklist-ppe-comments" name="checklist-ppe-comments" placeholder="Details if No or N/A"></textarea>
+          </div>
+        </div>
+
+        <div class="checklist-item">
+          <div class="item-label">Good Housekeeping Practices Maintained?</div>
+          <div class="radio-group">
+            <label><input type="radio" name="checklist-housekeeping" value="Yes" required>Yes</label>
+            <label><input type="radio" name="checklist-housekeeping" value="No">No</label>
+            <label><input type="radio" name="checklist-housekeeping" value="N/A">N/A</label>
+          </div>
+          <div class="checklist-comments">
+            <label for="checklist-housekeeping-comments">Comments</label>
+            <textarea id="checklist-housekeeping-comments" name="checklist-housekeeping-comments" placeholder="Details if No or N/A"></textarea>
+          </div>
+        </div>
+
+        <div class="checklist-item">
+          <div class="item-label">Emergency Exits Clearly Marked and Accessible?</div>
+          <div class="radio-group">
+            <label><input type="radio" name="checklist-exits" value="Yes" required>Yes</label>
+            <label><input type="radio" name="checklist-exits" value="No">No</label>
+            <label><input type="radio" name="checklist-exits" value="N/A">N/A</label>
+          </div>
+          <div class="checklist-comments">
+            <label for="checklist-exits-comments">Comments</label>
+            <textarea id="checklist-exits-comments" name="checklist-exits-comments" placeholder="Details if No or N/A"></textarea>
+          </div>
+        </div>
+
+        <div class="checklist-item">
+          <div class="item-label">Tools and Equipment in Safe Working Condition?</div>
+          <div class="radio-group">
+            <label><input type="radio" name="checklist-tools" value="Yes" required>Yes</label>
+            <label><input type="radio" name="checklist-tools" value="No">No</label>
+            <label><input type="radio" name="checklist-tools" value="N/A">N/A</label>
+          </div>
+          <div class="checklist-comments">
+            <label for="checklist-tools-comments">Comments</label>
+            <textarea id="checklist-tools-comments" name="checklist-tools-comments" placeholder="Details if No or N/A"></textarea>
+          </div>
+        </div>
+
+        <div class="checklist-item">
+          <div class="item-label">Fire Extinguishers Available and Inspected?</div>
+          <div class="radio-group">
+            <label><input type="radio" name="checklist-fire" value="Yes" required>Yes</label>
+            <label><input type="radio" name="checklist-fire" value="No">No</label>
+            <label><input type="radio" name="checklist-fire" value="N/A">N/A</label>
+          </div>
+          <div class="checklist-comments">
+            <label for="checklist-fire-comments">Comments</label>
+            <textarea id="checklist-fire-comments" name="checklist-fire-comments" placeholder="Details if No or N/A"></textarea>
+          </div>
+        </div>
+
+        <div class="checklist-item">
+          <div class="item-label">First Aid Kit Stocked and Accessible?</div>
+          <div class="radio-group">
+            <label><input type="radio" name="checklist-firstaid" value="Yes" required>Yes</label>
+            <label><input type="radio" name="checklist-firstaid" value="No">No</label>
+            <label><input type="radio" name="checklist-firstaid" value="N/A">N/A</label>
+          </div>
+          <div class="checklist-comments">
+            <label for="checklist-firstaid-comments">Comments</label>
+            <textarea id="checklist-firstaid-comments" name="checklist-firstaid-comments" placeholder="Details if No or N/A"></textarea>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Corrective Actions (CAPA)</legend>
+        <p class="help">Add corrective actions raised during inspection (Owner + target date + status).</p>
+
+        <div id="capaContainers">
+          <div class="capa-container" id="capaContainer-1">
+            <div class="grid2">
+              <div>
+                <label for="capaAction-1">Corrective Action</label>
+                <textarea id="capaAction-1" name="capaAction-1" placeholder="Describe the corrective action"></textarea>
+              </div>
+              <div>
+                <label for="capaCloseout-1">Closeout Notes</label>
+                <textarea id="capaCloseout-1" name="capaCloseout-1" placeholder="Evidence / remarks for closure (if any)"></textarea>
+              </div>
+            </div>
+
+            <div class="grid3" style="margin-top:.75rem;">
+              <div>
+                <label for="capaOwner-1">Owner</label>
+                <input type="text" id="capaOwner-1" name="capaOwner-1" placeholder="Responsible person" />
+              </div>
+              <div>
+                <label for="capaTarget-1">Target Date</label>
+                <input type="date" id="capaTarget-1" name="capaTarget-1" />
+              </div>
+              <div>
+                <label for="capaStatus-1">Status</label>
+                <select id="capaStatus-1" name="capaStatus-1">
+                  <option value="" selected>-- Select --</option>
+                  <option value="Open">Open</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Closed">Closed</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="btn-row" style="justify-content:flex-end">
+              <button type="button" class="remove remove-capa-btn">Remove Action</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="btn-row" style="justify-content:flex-start">
+          <button type="button" id="addCapaBtn" class="add">Add Another Action</button>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Photo Evidence</legend>
+        <p class="help">Upload photos (non-compliance, housekeeping, barricading, permits, etc.).</p>
+
+        <div id="photoContainers">
+          <div class="photo-upload-container" id="photoContainer-1">
+            <div class="grid2">
+              <div>
+                <label for="photoUpload-1">Upload Photo 1</label>
+                <input type="file" id="photoUpload-1" name="photoUpload-1" accept="image/*" capture="camera" />
+                <img id="photoPreview-1" class="photo-preview hidden" alt="Photo Preview"/>
+              </div>
+              <div>
+                <label for="photoCaption-1">Caption</label>
+                <textarea id="photoCaption-1" name="photoCaption-1" placeholder="Describe the photo"></textarea>
+              </div>
+            </div>
+
+            <div class="btn-row" style="justify-content:flex-end">
+              <button type="button" class="remove remove-photo-btn">Remove Photo</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="btn-row" style="justify-content:flex-start">
+          <button type="button" id="addPhotoBtn" class="add">Add Another Photo</button>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Observations</legend>
+        <p class="help">Record any observations, positive findings, or concerns.</p>
+
+        <div id="observationContainers">
+          <div class="observation-container" id="observationContainer-1">
+            <label for="observation-1">Observation 1</label>
+            <textarea id="observation-1" name="observation-1" placeholder="Enter your observation"></textarea>
+            <div class="btn-row" style="justify-content:flex-end">
+              <button type="button" class="remove remove-observation-btn">Remove Observation</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="btn-row" style="justify-content:flex-start">
+          <button type="button" id="addObservationBtn" class="add">Add Another Observation</button>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Inspector Signature</legend>
+        <p class="help">Sign using mouse or touch. The signature is stored in Drive as signature.png.</p>
+
+        <div class="signature-pad-container">
+          <canvas id="signaturePad"></canvas>
+
+          <div class="btn-row">
+            <button type="button" id="clearSignatureBtn" class="secondary">Clear Signature</button>
+          </div>
+
+          <input type="hidden" id="signatureData" name="signatureData" />
+          <img id="signaturePreview" class="photo-preview hidden" alt="Signature Preview"/>
+        </div>
+      </fieldset>
+
+      <div class="btn-row" style="margin-top: 1.25rem;">
+        <button type="submit" class="primary">Submit HSE Report</button>
+      </div>
+    </form>
+  </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  // =====================
+  // CONFIG - UPDATE IF NEEDED
+  // =====================
+  const ENDPOINT_URL = 'https://script.google.com/macros/s/AKfycbxRm8asg1KLaRKeIYaoEn2LsgqQXAzHgJT4iWYEafnT_hy2Z5U7lbPhyQhziHqULyIZoQ/exec';
+
+  // IMPORTANT: set the same token as in Apps Script (API_TOKEN)
+  const API_TOKEN = 'HSE-TAQA-2026-SECURE-KEY-98321';
+
+  // Project → Folder ID mapping (used by Apps Script)
+  const PROJECT_FOLDER_MAP = {
+  'TAQA WS O-16123': '1gMRc-OhcScKCDz5Z4xRI3Ba49if8pQBC',
+  'TAQA WS O-16124': '1A7rrudDh4KBd6c6DsiA0bnCe7PtDx7mF'
 /**
- * HSE Inspection Web App (Drive + Word Export) - FULL CODE
- * - doPost: saves payload to Drive (report.json, report.html, photos, signature, summary)
- * - doGet:  ?mode=export&folderId=...  generates Google Doc from report.json + images and exports DOCX to same folder
+ * HSE Inspection Web App (Drive + Word Export)
+ * - doPost: saves payload to Drive (same as your current flow)
+ * - NEW: /exec?mode=export&folderId=...  OR POST { mode:"export", folderId:"..." }
+ * - Generates Google Doc report from report.json + images in the same folder
+ * - Exports as DOCX into the same folder
  *
  * DEPLOY:
- * - Deploy as: Web App
  * - Execute as: Me (USER_DEPLOYING)
  * - Access: Anyone
- *
- * AFTER CHANGES:
- * 1) Run testAuthorize_() once in the Apps Script editor
- * 2) Deploy -> Manage deployments -> Edit -> NEW VERSION -> Update
+ * - After adding Documents scope: Run testAuthorize_() then Deploy NEW VERSION
  */
 
 // ===========================
 // CONFIGURATION
 // ===========================
-
 const PROJECT_FOLDERS = {
   "TAQA WS O-16123": "1gMRc-OhcScKCDz5Z4xRI3Ba49if8pQBC",
   "TAQA WS O-16124": "1A7rrudDh4KBd6c6DsiA0bnCe7PtDx7mF"
@@ -24,31 +389,55 @@ const PROJECT_FOLDERS = {
 
 const API_TOKEN = "HSE-TAQA-2026-SECURE-KEY-98321";
 const ALLOW_NO_TOKEN_FOR_TESTING = false;
-const ALLOWED_DOMAIN = ""; // e.g. "hydropower.ae" (keep "" to disable)
+const ALLOWED_DOMAIN = ""; // keep "" to disable
 
-// If true: after save, server also generates DOCX immediately (slower response time).
-const AUTO_EXPORT_DOCX_AFTER_SAVE = false;
-
+  // =====================
+  // ELEMENTS
+  // =====================
+  const hseReportForm = document.getElementById('hseReportForm');
 // ===========================
 // ENTRY POINTS
 // ===========================
 
+  const reportDateInput = document.getElementById('reportDate');
+  const reportNumberInput = document.getElementById('reportNumber');
 function doGet(e) {
   const mode = (e && e.parameter && e.parameter.mode) ? String(e.parameter.mode) : "health";
 
+  const projectNameSelect = document.getElementById('projectName');
+  const projectFolderIdInput = document.getElementById('projectFolderId');
   if (mode === "drive") {
     const sanity = driveSanityCheck_();
     return jsonResponse_({ ok: true, mode: "drive", driveSanity: sanity }, 200);
   }
 
+  const apiTokenInput = document.getElementById('apiToken');
+  apiTokenInput.value = API_TOKEN;
   if (mode === "export") {
     const folderId = (e && e.parameter && e.parameter.folderId) ? String(e.parameter.folderId) : "";
     if (!folderId) return jsonResponse_({ ok: false, message: "Missing folderId for export." }, 400);
 
+  // Geolocation
+  const getLocationBtn = document.getElementById('getLocationBtn');
+  const geoLat = document.getElementById('geoLat');
+  const geoLng = document.getElementById('geoLng');
+  const geoAcc = document.getElementById('geoAcc');
+  const geoStatus = document.getElementById('geoStatus');
+  const geoOk = document.getElementById('geoOk');
+  const geoErr = document.getElementById('geoErr');
+
+  // Photos
+  let photoCounter = 1;
+  const photoContainers = document.getElementById('photoContainers');
+  const addPhotoBtn = document.getElementById('addPhotoBtn');
     const result = createAndExportWordReport_(folderId);
     return jsonResponse_({ ok: true, mode: "export", ...result }, 200);
   }
 
+  // Observations
+  let observationCounter = 1;
+  const observationContainers = document.getElementById('observationContainers');
+  const addObservationBtn = document.getElementById('addObservationBtn');
   return jsonResponse_({
     ok: true,
     mode: "health",
@@ -58,21 +447,85 @@ function doGet(e) {
   }, 200);
 }
 
+  // CAPA
+  let capaCounter = 1;
+  const capaContainers = document.getElementById('capaContainers');
+  const addCapaBtn = document.getElementById('addCapaBtn');
 function doPost(e) {
   try {
     assertDriveAppAvailable_();
 
+  // Signature
+  const signaturePadCanvas = document.getElementById('signaturePad');
+  const signaturePadCtx = signaturePadCanvas.getContext('2d');
+  const clearSignatureBtn = document.getElementById('clearSignatureBtn');
+  const signatureDataInput = document.getElementById('signatureData');
+  const signaturePreview = document.getElementById('signaturePreview');
+
+  // =====================
+  // HELPERS
+  // =====================
+  const fileToDataUrl = (file) => new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+
+  const pad4 = (n) => String(n).padStart(4, '0');
+
+  const ymd = (d) => {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth()+1).padStart(2,'0');
+    const dd = String(d.getDate()).padStart(2,'0');
+    return `${yyyy}${mm}${dd}`;
+  };
     if (!e || !e.postData || !e.postData.contents) {
       return jsonResponse_({ ok: false, message: "Missing request body." }, 400);
     }
 
+  const generateReportNumber = () => {
+    const dateVal = reportDateInput.value;
+    const dt = dateVal ? new Date(dateVal + 'T00:00:00') : new Date();
+    const rnd = Math.floor(Math.random() * 10000);
+    reportNumberInput.value = `HSE-${ymd(dt)}-${pad4(rnd)}`;
+  };
     const payload = JSON.parse(e.postData.contents);
 
-    // Optional: allow POST export requests too
+    // Optional: allow POST export
     if (String(payload.mode || "").toLowerCase() === "export") {
       const tokenOk = validateToken_(payload);
       if (!tokenOk.ok) return jsonResponse_(tokenOk, tokenOk.statusCode);
 
+  const show = (el) => el.classList.remove('hidden');
+  const hide = (el) => el.classList.add('hidden');
+
+  // =====================
+  // INIT
+  // =====================
+  reportDateInput.valueAsDate = new Date();
+  generateReportNumber();
+
+  reportDateInput.addEventListener('change', () => generateReportNumber());
+
+  projectNameSelect.addEventListener('change', () => {
+    const project = projectNameSelect.value;
+    projectFolderIdInput.value = PROJECT_FOLDER_MAP[project] || '';
+  });
+
+  // =====================
+  // GEOLOCATION
+  // =====================
+  getLocationBtn.addEventListener('click', () => {
+    hide(geoOk); hide(geoErr);
+    geoStatus.textContent = 'Waiting for GPS…';
+    show(geoStatus);
+
+    if (!navigator.geolocation) {
+      hide(geoStatus);
+      geoErr.textContent = 'Location not supported by this browser.';
+      show(geoErr);
+      return;
       const folderId = String(payload.folderId || "").trim();
       if (!folderId) return jsonResponse_({ ok: false, message: "Missing folderId." }, 400);
 
@@ -80,6 +533,46 @@ function doPost(e) {
       return jsonResponse_({ ok: true, mode: "export", ...result }, 200);
     }
 
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        geoLat.value = pos.coords.latitude.toFixed(6);
+        geoLng.value = pos.coords.longitude.toFixed(6);
+        geoAcc.value = Math.round(pos.coords.accuracy);
+        hide(geoStatus);
+        show(geoOk);
+      },
+      (err) => {
+        hide(geoStatus);
+        geoErr.textContent = err.message || 'Unable to retrieve location.';
+        show(geoErr);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  });
+
+  // =====================
+  // PHOTOS
+  // =====================
+  const attachPhotoListeners = (id) => {
+    const photoUpload = document.getElementById(`photoUpload-${id}`);
+    const photoPreview = document.getElementById(`photoPreview-${id}`);
+    const removeBtn = document.querySelector(`#photoContainer-${id} .remove-photo-btn`);
+
+    if (photoUpload) {
+      photoUpload.addEventListener('change', (event) => {
+        const file = event.target.files && event.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (e) => {
+            photoPreview.src = e.target.result;
+            photoPreview.classList.remove('hidden');
+          };
+          reader.readAsDataURL(file);
+        } else {
+          photoPreview.src = '';
+          photoPreview.classList.add('hidden');
+        }
+      });
     // ---------------------------
     // DOMAIN LOCK (optional)
     // ---------------------------
@@ -97,6 +590,11 @@ function doPost(e) {
       }
     }
 
+    if (removeBtn) {
+      removeBtn.addEventListener('click', () => {
+        const container = document.getElementById(`photoContainer-${id}`);
+        if (container && photoContainers.children.length > 1) container.remove();
+      });
     // ---------------------------
     // TOKEN VALIDATION
     // ---------------------------
@@ -116,9 +614,7 @@ function doPost(e) {
     const inspectorName = sanitize_(payload.inspectorName || "Unknown_Inspector");
     const reportNumber = sanitize_(payload.reportNumber || buildReportNumber_(reportDate));
 
-    // ---------------------------
-    // RESOLVE PROJECT ROOT FOLDER ID
-    // ---------------------------
+    // Resolve project root folder id
     const projectFolderId = folderIdFromForm || PROJECT_FOLDERS[projectName];
     if (!projectFolderId) {
       return jsonResponse_({
@@ -127,18 +623,54 @@ function doPost(e) {
         projectName
       }, 400);
     }
+  };
+  attachPhotoListeners(1);
 
-    // ---------------------------
-    // CREATE STRUCTURE
-    // ---------------------------
+  addPhotoBtn.addEventListener('click', () => {
+    photoCounter++;
+    const id = photoCounter;
+
+    const container = document.createElement('div');
+    container.className = 'photo-upload-container';
+    container.id = `photoContainer-${id}`;
+    container.innerHTML = `
+      <div class="grid2">
+        <div>
+          <label for="photoUpload-${id}">Upload Photo ${id}</label>
+          <input type="file" id="photoUpload-${id}" name="photoUpload-${id}" accept="image/*" capture="camera" />
+          <img id="photoPreview-${id}" class="photo-preview hidden" alt="Photo Preview"/>
+        </div>
+        <div>
+          <label for="photoCaption-${id}">Caption</label>
+          <textarea id="photoCaption-${id}" name="photoCaption-${id}" placeholder="Describe the photo"></textarea>
+        </div>
+      </div>
+      <div class="btn-row" style="justify-content:flex-end">
+        <button type="button" class="remove remove-photo-btn">Remove Photo</button>
+      </div>
+    `;
+    photoContainers.appendChild(container);
+    attachPhotoListeners(id);
+  });
+
+  // =====================
+  // OBSERVATIONS
+  // =====================
+  const attachObservationListeners = (id) => {
+    const removeBtn = document.querySelector(`#observationContainer-${id} .remove-observation-btn`);
+    if (removeBtn) {
+      removeBtn.addEventListener('click', () => {
+        const container = document.getElementById(`observationContainer-${id}`);
+        if (container && observationContainers.children.length > 1) container.remove();
+      });
+
+    // Create structure
     const projectRoot = safeGetFolderById_(projectFolderId, "ProjectRoot");
     const yearFolder = getOrCreateFolderIn_(projectRoot, year);
     const siteFolder = getOrCreateFolderIn_(yearFolder, siteLocation);
     const recordFolder = getOrCreateFolderIn_(siteFolder, reportNumber);
 
-    // ---------------------------
-    // SAVE MAIN JSON + FILES
-    // ---------------------------
+    // Save payload
     payload._server = {
       savedAt: new Date().toISOString(),
       savedBy: safeActiveUserEmail_(),
@@ -149,18 +681,47 @@ function doPost(e) {
 
     recordFolder.createFile("report.json", JSON.stringify(payload, null, 2), MimeType.JSON);
 
-    // Optional HTML snapshot
     if (payload.renderedHtml && String(payload.renderedHtml).trim().length > 0) {
       recordFolder.createFile("report.html", String(payload.renderedHtml), MimeType.HTML);
     }
+  };
+  attachObservationListeners(1);
 
-    // Signature
+  addObservationBtn.addEventListener('click', () => {
+    observationCounter++;
+    const id = observationCounter;
+
+    const container = document.createElement('div');
+    container.className = 'observation-container';
+    container.id = `observationContainer-${id}`;
+    container.innerHTML = `
+      <label for="observation-${id}">Observation ${id}</label>
+      <textarea id="observation-${id}" name="observation-${id}" placeholder="Enter your observation"></textarea>
+      <div class="btn-row" style="justify-content:flex-end">
+        <button type="button" class="remove remove-observation-btn">Remove Observation</button>
+      </div>
+    `;
+    observationContainers.appendChild(container);
+    attachObservationListeners(id);
+  });
+
+  // =====================
+  // CAPA
+  // =====================
+  const attachCapaListeners = (id) => {
+    const removeBtn = document.querySelector(`#capaContainer-${id} .remove-capa-btn`);
+    if (removeBtn) {
+      removeBtn.addEventListener('click', () => {
+        const container = document.getElementById(`capaContainer-${id}`);
+        if (container && capaContainers.children.length > 1) container.remove();
+
+    // signature
     if (payload.signatureData && String(payload.signatureData).startsWith("data:image")) {
       const sigBlob = dataUrlToBlob_(payload.signatureData, "signature.png");
       recordFolder.createFile(sigBlob);
     }
 
-    // Photos
+    // photos
     if (Array.isArray(payload.photos) && payload.photos.length > 0) {
       payload.photos.forEach((p, idx) => {
         if (!p || !p.dataUrl || !String(p.dataUrl).startsWith("data:image")) return;
@@ -179,8 +740,71 @@ function doPost(e) {
         }
       });
     }
+  };
+  attachCapaListeners(1);
 
-    // Summary
+  addCapaBtn.addEventListener('click', () => {
+    capaCounter++;
+    const id = capaCounter;
+
+    const container = document.createElement('div');
+    container.className = 'capa-container';
+    container.id = `capaContainer-${id}`;
+    container.innerHTML = `
+      <div class="grid2">
+        <div>
+          <label for="capaAction-${id}">Corrective Action</label>
+          <textarea id="capaAction-${id}" name="capaAction-${id}" placeholder="Describe the corrective action"></textarea>
+        </div>
+        <div>
+          <label for="capaCloseout-${id}">Closeout Notes</label>
+          <textarea id="capaCloseout-${id}" name="capaCloseout-${id}" placeholder="Evidence / remarks for closure (if any)"></textarea>
+        </div>
+      </div>
+
+      <div class="grid3" style="margin-top:.75rem;">
+        <div>
+          <label for="capaOwner-${id}">Owner</label>
+          <input type="text" id="capaOwner-${id}" name="capaOwner-${id}" placeholder="Responsible person" />
+        </div>
+        <div>
+          <label for="capaTarget-${id}">Target Date</label>
+          <input type="date" id="capaTarget-${id}" name="capaTarget-${id}" />
+        </div>
+        <div>
+          <label for="capaStatus-${id}">Status</label>
+          <select id="capaStatus-${id}" name="capaStatus-${id}">
+            <option value="" selected>-- Select --</option>
+            <option value="Open">Open</option>
+            <option value="In Progress">In Progress</option>
+            <option value="Closed">Closed</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="btn-row" style="justify-content:flex-end">
+        <button type="button" class="remove remove-capa-btn">Remove Action</button>
+      </div>
+    `;
+    capaContainers.appendChild(container);
+    attachCapaListeners(id);
+  });
+
+  // =====================
+  // SIGNATURE PAD
+  // =====================
+  const resizeCanvas = () => {
+    const ratio = Math.max(window.devicePixelRatio || 1, 1);
+    signaturePadCanvas.width = signaturePadCanvas.offsetWidth * ratio;
+    signaturePadCanvas.height = signaturePadCanvas.offsetHeight * ratio;
+    signaturePadCtx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  };
+  window.addEventListener('resize', resizeCanvas);
+  resizeCanvas();
+
+  let drawing = false;
+  let lastX = 0, lastY = 0;
+    // summary
     const summary = buildSummaryText_(payload, {
       projectName,
       reportNumber,
@@ -190,25 +814,13 @@ function doPost(e) {
     });
     recordFolder.createFile("summary.txt", summary, MimeType.PLAIN_TEXT);
 
-    // ---------------------------
-    // OPTIONAL AUTO EXPORT DOCX
-    // ---------------------------
-    let exportResult = null;
-    if (AUTO_EXPORT_DOCX_AFTER_SAVE) {
-      exportResult = createAndExportWordReport_(recordFolder.getId());
-    }
-
-    // ---------------------------
-    // RESPONSE
-    // ---------------------------
     return jsonResponse_({
       ok: true,
       message: "Saved to Google Drive",
       projectName,
       reportNumber,
       folderName: recordFolder.getName(),
-      folderId: recordFolder.getId(),
-      export: exportResult // null unless AUTO_EXPORT_DOCX_AFTER_SAVE=true
+      folderId: recordFolder.getId()
     }, 200);
 
   } catch (err) {
@@ -216,22 +828,64 @@ function doPost(e) {
   }
 }
 
+  const getPos = (evt) => {
+    const rect = signaturePadCanvas.getBoundingClientRect();
+    if (evt.touches && evt.touches.length > 0) {
+      return [evt.touches[0].clientX - rect.left, evt.touches[0].clientY - rect.top];
+    }
+    return [evt.clientX - rect.left, evt.clientY - rect.top];
+  };
 // ===========================
 // WORD EXPORT (DOCX) - MAIN
 // ===========================
 
+  const start = (e) => { drawing = true; [lastX,lastY] = getPos(e); };
+  const move = (e) => {
+    if (!drawing) return;
+    e.preventDefault();
+    const [x,y] = getPos(e);
+    signaturePadCtx.beginPath();
+    signaturePadCtx.moveTo(lastX,lastY);
+    signaturePadCtx.lineTo(x,y);
+    signaturePadCtx.strokeStyle = '#000';
+    signaturePadCtx.lineWidth = 2;
+    signaturePadCtx.lineCap = 'round';
+    signaturePadCtx.lineJoin = 'round';
+    signaturePadCtx.stroke();
+    [lastX,lastY] = [x,y];
+  };
+  const stop = () => { drawing = false; };
+
+  signaturePadCanvas.addEventListener('mousedown', start);
+  signaturePadCanvas.addEventListener('mousemove', move);
+  signaturePadCanvas.addEventListener('mouseup', stop);
+  signaturePadCanvas.addEventListener('mouseout', stop);
+
+  signaturePadCanvas.addEventListener('touchstart', start, { passive:false });
+  signaturePadCanvas.addEventListener('touchmove', move, { passive:false });
+  signaturePadCanvas.addEventListener('touchend', stop);
+  signaturePadCanvas.addEventListener('touchcancel', stop);
+
+  const isCanvasEmpty = () => {
+    const blank = document.createElement('canvas');
+    blank.width = signaturePadCanvas.width;
+    blank.height = signaturePadCanvas.height;
+    return signaturePadCanvas.toDataURL() === blank.toDataURL();
 function createAndExportWordReport_(recordFolderId) {
   assertDriveAppAvailable_();
 
+  // Ensure DocumentApp is available
   if (typeof DocumentApp === "undefined" || !DocumentApp) {
-    throw new Error("DocumentApp is not available. Add documents scope + run testAuthorize_() + deploy NEW VERSION.");
+    throw new Error("DocumentApp is not available. Ensure Documents scope is added and you redeployed a NEW VERSION.");
   }
 
   const recordFolder = safeGetFolderById_(recordFolderId, "RecordFolder");
 
   // Load report.json
   const reportFile = findFirstFileByName_(recordFolder, "report.json");
-  if (!reportFile) throw new Error("report.json not found in the record folder. Cannot generate report.");
+  if (!reportFile) {
+    throw new Error("report.json not found in the record folder. Cannot generate report.");
+  }
 
   const payload = JSON.parse(reportFile.getBlob().getDataAsString("UTF-8"));
 
@@ -249,15 +903,36 @@ function createAndExportWordReport_(recordFolderId) {
     geo: payload.geolocation || {}
   };
 
+  clearSignatureBtn.addEventListener('click', () => {
+    signaturePadCtx.clearRect(0,0,signaturePadCanvas.width, signaturePadCanvas.height);
+    signatureDataInput.value = '';
+    signaturePreview.src = '';
+    signaturePreview.classList.add('hidden');
+  });
+
+  // =====================
+  // SUBMIT
+  // =====================
+  hseReportForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    if (!projectNameSelect.value) {
+      alert('Please select a project.');
+      projectNameSelect.focus();
+      return;
+    }
+    projectFolderIdInput.value = PROJECT_FOLDER_MAP[projectNameSelect.value] || '';
   // Create Google Doc
   const docTitle = `HSE Inspection Report - ${meta.reportNumber}`;
   const doc = DocumentApp.create(docTitle);
   const docId = doc.getId();
+
   const body = doc.getBody();
   body.clear();
 
   // Header
-  body.appendParagraph("DAILY HSE INSPECTION REPORT").setHeading(DocumentApp.ParagraphHeading.HEADING1);
+  const title = body.appendParagraph("DAILY HSE INSPECTION REPORT");
+  title.setHeading(DocumentApp.ParagraphHeading.HEADING1);
 
   body.appendParagraph(`Report No: ${meta.reportNumber}`);
   body.appendParagraph(`Date: ${meta.reportDate}`);
@@ -271,6 +946,12 @@ function createAndExportWordReport_(recordFolderId) {
   body.appendParagraph(`Inspector: ${meta.inspectorName}`);
   body.appendParagraph("");
 
+    if (!signatureDataInput.value && !isCanvasEmpty()) {
+      const sig = signaturePadCanvas.toDataURL('image/png');
+      signatureDataInput.value = sig;
+      signaturePreview.src = sig;
+      signaturePreview.classList.remove('hidden');
+    }
   // Geolocation
   if (meta.geo && meta.geo.lat && meta.geo.lng) {
     body.appendParagraph("GEOLOCATION").setHeading(DocumentApp.ParagraphHeading.HEADING2);
@@ -280,25 +961,73 @@ function createAndExportWordReport_(recordFolderId) {
     body.appendParagraph("");
   }
 
+    const formData = new FormData(hseReportForm);
+
+    const payload = {
+      apiToken: API_TOKEN,
+      reportNumber: formData.get('reportNumber') || '',
+      reportDate: formData.get('reportDate') || new Date().toISOString().slice(0,10),
+
+      projectName: formData.get('projectName') || '',
+     
+
+      siteLocation: formData.get('siteLocation') || '',
+      areaLocation: formData.get('areaLocation') || '',
+      workOrder: formData.get('workOrder') || '',
+      permitNo: formData.get('permitNo') || '',
+      supervisorName: formData.get('supervisorName') || '',
+      contractorName: formData.get('contractorName') || '',
+      inspectorName: formData.get('inspectorName') || '',
+
+      geolocation: {
+        lat: geoLat.value || '',
+        lng: geoLng.value || '',
+        accuracyM: geoAcc.value || ''
+      },
+
+      signatureData: formData.get('signatureData') || '',
+      checklist: {},
+      observations: [],
+      correctiveActions: [],
+      photos: [],
+
+      submittedAt: new Date().toISOString(),
+      userAgent: navigator.userAgent
+    };
   // Checklist
   body.appendParagraph("INSPECTION CHECKLIST").setHeading(DocumentApp.ParagraphHeading.HEADING2);
   const checklist = payload.checklist || {};
   const checklistKeys = Object.keys(checklist);
 
+    for (const [key, value] of formData.entries()) {
+      if (key.startsWith('checklist-') && !key.endsWith('-comments')) {
+        payload.checklist[key] = {
+          result: value,
+          comments: formData.get(`${key}-comments`) || ''
+        };
+      }
+    }
   if (checklistKeys.length === 0) {
     body.appendParagraph("No checklist items recorded.");
   } else {
     const table = body.appendTable([["Item", "Result", "Comments"]]);
     checklistKeys.forEach(k => {
       const item = checklist[k] || {};
-      const row = table.appendTableRow();
-      row.appendTableCell(String(k));
-      row.appendTableCell(String(item.result || ""));
-      row.appendTableCell(String(item.comments || ""));
+      table.appendTableRow()
+        .appendTableCell(String(k))
+        .getParentRow()
+        .appendTableCell(String(item.result || ""))
+        .getParentRow()
+        .appendTableCell(String(item.comments || ""));
     });
   }
   body.appendParagraph("");
 
+    for (const [key, value] of formData.entries()) {
+      if (key.startsWith('observation-') && value && String(value).trim().length > 0) {
+        payload.observations.push(String(value).trim());
+      }
+    }
   // Observations
   body.appendParagraph("OBSERVATIONS").setHeading(DocumentApp.ParagraphHeading.HEADING2);
   if (Array.isArray(payload.observations) && payload.observations.length > 0) {
@@ -325,24 +1054,30 @@ function createAndExportWordReport_(recordFolderId) {
   }
   body.appendParagraph("");
 
-  // Photos
+    const capaBlocks = Array.from(document.querySelectorAll('[id^="capaContainer-"]'));
+    capaBlocks.forEach(block => {
+      const id = block.id.split('-')[1];
+      const action = (document.getElementById(`capaAction-${id}`)?.value || '').trim();
+      const owner = (document.getElementById(`capaOwner-${id}`)?.value || '').trim();
+      const targetDate = (document.getElementById(`capaTarget-${id}`)?.value || '').trim();
+      const status = (document.getElementById(`capaStatus-${id}`)?.value || '').trim();
+      const closeoutNotes = (document.getElementById(`capaCloseout-${id}`)?.value || '').trim();
+
+      if (action || owner || targetDate || status || closeoutNotes) {
+        payload.correctiveActions.push({ action, owner, targetDate, status, closeoutNotes });
+  // Evidence: Photos
   body.appendParagraph("PHOTO EVIDENCE").setHeading(DocumentApp.ParagraphHeading.HEADING2);
 
-  const photos = listFilesByPrefix_(recordFolder, "photo_")
-    .filter(f => /\.(jpg|jpeg|png|webp)$/i.test(f.getName()));
-
+  const photos = listFilesByPrefix_(recordFolder, "photo_");
   if (photos.length === 0) {
     body.appendParagraph("No photos uploaded.");
   } else {
     photos.forEach(file => {
       const blob = file.getBlob();
       const img = body.appendImage(blob);
-      img.setWidth(520); // A4-friendly width
-
+      img.setWidth(520); // fits A4 nicely in DOC
       body.appendParagraph(file.getName());
-
-      const captionName = file.getName().replace(/\.(jpg|jpeg|png|webp)$/i, "_caption.txt");
-      const captionFile = findFirstFileByName_(recordFolder, captionName);
+      const captionFile = findFirstFileByName_(recordFolder, file.getName().replace(/\.(jpg|jpeg|png|webp)$/i, "_caption.txt"));
       if (captionFile) {
         body.appendParagraph("Caption: " + captionFile.getBlob().getDataAsString("UTF-8"));
       }
@@ -350,6 +1085,13 @@ function createAndExportWordReport_(recordFolderId) {
     });
   }
 
+    const photoUploads = [];
+    for (const [key, value] of formData.entries()) {
+      if (key.startsWith('photoUpload-') && value instanceof File && value.size > 0) {
+        const id = key.split('-')[1];
+        photoUploads.push({ id, file: value });
+      }
+    }
   // Signature
   body.appendParagraph("INSPECTOR SIGNATURE").setHeading(DocumentApp.ParagraphHeading.HEADING2);
   const sig = findFirstFileByName_(recordFolder, "signature.png");
@@ -360,20 +1102,42 @@ function createAndExportWordReport_(recordFolderId) {
     body.appendParagraph("No signature captured.");
   }
 
+    for (const p of photoUploads) {
+      try {
+        const dataUrl = await fileToDataUrl(p.file);
+        const caption = (formData.get(`photoCaption-${p.id}`) || '').toString();
+        payload.photos.push({ dataUrl, caption });
+      } catch (err) {
+        console.warn('Photo read failed:', err);
+      }
+    }
   body.appendParagraph("");
   body.appendParagraph(`Generated on: ${new Date().toISOString()}`);
 
+    payload.renderedHtml = document.documentElement.outerHTML;
   doc.saveAndClose();
 
+    try {
+  const res = await fetch(ENDPOINT_URL, {
+    method: 'POST',
+    redirect: 'follow',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload)
+  });
   // Move Doc into the record folder
   const docFile = DriveApp.getFileById(docId);
   recordFolder.addFile(docFile);
 
+  const text = await res.text();
+  console.log("HTTP Status:", res.status);
+  console.log("Response:", text);
   // Export to DOCX and save into same folder
   const exportBlob = docFile.getBlob().getAs(MimeType.MICROSOFT_WORD);
   const docxName = `${docTitle}.docx`;
   const docxFile = recordFolder.createFile(exportBlob.setName(docxName));
 
+  let result = null;
+  try { result = JSON.parse(text); } catch (e) {}
   return {
     recordFolderId,
     googleDocId: docId,
@@ -383,13 +1147,19 @@ function createAndExportWordReport_(recordFolderId) {
   };
 }
 
+  if (result && result.ok) {
+    alert(`Saved to Google Drive.\nReport: ${result.reportNumber}\nFolder ID: ${result.folderId}`);
+  } else {
+    alert(`Save failed.\nHTTP: ${res.status}\nResponse: ${text}`);
 // ===========================
 // AUTH / DIAGNOSTICS
 // ===========================
 
 function testAuthorize_() {
   assertDriveAppAvailable_();
-  Logger.log("Drive OK. Root: " + DriveApp.getRootFolder().getName());
+  // Touch Drive & Document scopes
+  const root = DriveApp.getRootFolder().getName();
+  Logger.log("Drive OK. Root: " + root);
 
   const d = DocumentApp.create("AUTH_TEST_HSE_DOC_" + new Date().toISOString().replace(/[:.]/g, "_"));
   Logger.log("Document OK. DocId: " + d.getId());
@@ -415,9 +1185,17 @@ function validateToken_(payload) {
   } else if (token !== API_TOKEN) {
     return { ok: false, statusCode: 401, message: "Unauthorized (invalid token)." };
   }
+} catch (err) {
+  console.error("Network error:", err);
+  alert("Submission failed (network/CORS). Open Console (F12) and check the error details.");
   return { ok: true, statusCode: 200 };
 }
 
+  });
+});
+</script>
+</body>
+</html>
 function assertDriveAppAvailable_() {
   if (typeof DriveApp === "undefined" || !DriveApp) {
     throw new Error("DriveApp is not available. Ensure Drive scope exists and deployment is correct.");
@@ -465,9 +1243,7 @@ function listFilesByPrefix_(folder, prefix) {
 
 function jsonResponse_(obj, statusCode) {
   const body = { statusCode: statusCode || 200, ...obj };
-  return ContentService
-    .createTextOutput(JSON.stringify(body))
-    .setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify(body)).setMimeType(ContentService.MimeType.JSON);
 }
 
 function safeActiveUserEmail_() {
@@ -484,11 +1260,7 @@ function getOrCreateFolderIn_(parentFolder, name) {
 }
 
 function sanitize_(value) {
-  return String(value)
-    .trim()
-    .replace(/[\/\\:*?"<>|]/g, "_")
-    .replace(/\s+/g, " ")
-    .substring(0, 120);
+  return String(value).trim().replace(/[\/\\:*?"<>|]/g, "_").replace(/\s+/g, " ").substring(0, 120);
 }
 
 function dataUrlToBlob_(dataUrl, filename) {
@@ -527,52 +1299,6 @@ function buildSummaryText_(payload, meta) {
   lines.push(`Site/Area: ${meta.siteLocation}`);
   lines.push(`Inspector: ${meta.inspectorName}`);
   lines.push("");
-
-  if (payload.workOrder) lines.push(`Work Order: ${payload.workOrder}`);
-  if (payload.permitNo) lines.push(`Permit No: ${payload.permitNo}`);
-  if (payload.supervisorName) lines.push(`Supervisor: ${payload.supervisorName}`);
-  if (payload.contractorName) lines.push(`Contractor: ${payload.contractorName}`);
-  if (payload.areaLocation) lines.push(`Area Location: ${payload.areaLocation}`);
-  lines.push("");
-
-  if (payload.geolocation && payload.geolocation.lat && payload.geolocation.lng) {
-    lines.push(`Geolocation: ${payload.geolocation.lat}, ${payload.geolocation.lng} (±${payload.geolocation.accuracyM || "?"}m)`);
-    lines.push("");
-  }
-
-  const checklist = payload.checklist || {};
-  const keys = Object.keys(checklist);
-  if (keys.length > 0) {
-    lines.push("Checklist:");
-    keys.forEach(k => {
-      const item = checklist[k] || {};
-      const result = item.result || "";
-      const comments = item.comments ? ` | ${String(item.comments).trim()}` : "";
-      lines.push(`- ${k}: ${result}${comments}`);
-    });
-    lines.push("");
-  }
-
-  if (Array.isArray(payload.observations) && payload.observations.length > 0) {
-    lines.push("Observations:");
-    payload.observations.forEach((o, i) => lines.push(`${i + 1}. ${String(o).trim()}`));
-    lines.push("");
-  }
-
-  if (Array.isArray(payload.correctiveActions) && payload.correctiveActions.length > 0) {
-    lines.push("Corrective Actions:");
-    payload.correctiveActions.forEach((a, i) => {
-      lines.push(`${i + 1}. Action: ${a.action || ""}`);
-      lines.push(`   Owner: ${a.owner || ""} | Target: ${a.targetDate || ""} | Status: ${a.status || ""}`);
-      if (a.closeoutNotes) lines.push(`   Notes: ${a.closeoutNotes}`);
-    });
-    lines.push("");
-  }
-
-  const hasSig = !!payload.signatureData;
-  const photoCount = Array.isArray(payload.photos) ? payload.photos.length : 0;
-  lines.push(`Evidence: Signature=${hasSig ? "Yes" : "No"}, Photos=${photoCount}`);
-
   return lines.join("\n");
 }
 
