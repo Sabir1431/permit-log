@@ -758,7 +758,7 @@ document.addEventListener('DOMContentLoaded', () => {
   hseReportForm.addEventListener('submit', async (event) => {
     event.preventDefault();
 
-    if (!ENDPOINT_URL || ENDPOINT_URL.includes('PASTE_YOUR_WEB_APP_EXEC_URL_HERE')) {
+    if (!ENDPOINT_URL || ENDPOINT_URL.includes('https://script.google.com/macros/s/AKfycbxRm8asg1KLaRKeIYaoEn2LsgqQXAzHgJT4iWYEafnT_hy2Z5U7lbPhyQhziHqULyIZoQ/exec')) {
       alert("Please set ENDPOINT_URL in the HTML to your Apps Script /exec URL.");
       return;
     }
