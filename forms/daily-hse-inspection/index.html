@@ -418,3 +418,341 @@
                             <img id="signaturePreview" class="photo-preview hidden mt-4" alt="Signature Preview">
                         </div>
                     </fieldset>
+
+                    <div class="button-group mt-8">
+                        <button type="submit" class="primary-btn">Submit HSE Report</button>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <!-- JavaScript functionality for the form -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const hseReportForm = document.getElementById('hseReportForm');
+            const reportDateInput = document.getElementById('reportDate');
+            reportDateInput.valueAsDate = new Date();
+
+            // Google Apps Script Web App endpoint (stores submitted reports in Google Drive)
+            const ENDPOINT_URL = 'https://script.google.com/macros/s/AKfycbzl_yDpt0RCVkkU2yyjEKmpYUr2KsfIzp_mo9GiBQXXp9332POsD59M1IrGZj6d54FzWg/exec';
+
+            // Photo Capture Functionality
+            let photoCounter = 1;
+            const photoContainers = document.getElementById('photoContainers');
+            const addPhotoBtn = document.getElementById('addPhotoBtn');
+
+            // Helper: convert File to Base64 Data URL
+            const fileToDataUrl = (file) => new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(reader.error);
+                reader.readAsDataURL(file);
+            });
+
+            const attachPhotoListeners = (id) => {
+                const photoUpload = document.getElementById(`photoUpload-${id}`);
+                const photoPreview = document.getElementById(`photoPreview-${id}`);
+                const removeBtn = document.querySelector(`#photoContainer-${id} .remove-photo-btn`);
+
+                if (photoUpload) {
+                    photoUpload.addEventListener('change', (event) => {
+                        const file = event.target.files[0];
+                        if (file) {
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
+                                photoPreview.src = e.target.result;
+                                photoPreview.classList.remove('hidden');
+                            };
+                            reader.readAsDataURL(file);
+                        } else {
+                            photoPreview.src = "";
+                            photoPreview.classList.add('hidden');
+                        }
+                    });
+                }
+
+                if (removeBtn) {
+                    removeBtn.addEventListener('click', () => {
+                        const container = document.getElementById(`photoContainer-${id}`);
+                        if (container && photoContainers.children.length > 1) {
+                            container.remove();
+                        }
+                    });
+                }
+            };
+
+            addPhotoBtn.addEventListener('click', () => {
+                photoCounter++;
+                const newPhotoId = photoCounter;
+
+                const newPhotoContainer = document.createElement('div');
+                newPhotoContainer.classList.add('photo-upload-container');
+                newPhotoContainer.id = `photoContainer-${newPhotoId}`;
+                newPhotoContainer.innerHTML = `
+                    <div class="form-group">
+                        <label for="photoUpload-${newPhotoId}">Upload Photo ${newPhotoId}:</label>
+                        <input type="file" id="photoUpload-${newPhotoId}" name="photoUpload-${newPhotoId}" accept="image/*" capture="camera">
+                        <img id="photoPreview-${newPhotoId}" class="photo-preview hidden" alt="Photo Preview">
+                    </div>
+                    <div class="form-group">
+                        <label for="photoCaption-${newPhotoId}">Caption for Photo ${newPhotoId}:</label>
+                        <textarea id="photoCaption-${newPhotoId}" name="photoCaption-${newPhotoId}" placeholder="Describe the photo"></textarea>
+                    </div>
+                    <div class="button-group justify-end">
+                        <button type="button" class="remove-photo-btn remove-btn">Remove Photo</button>
+                    </div>
+                `;
+                photoContainers.appendChild(newPhotoContainer);
+                attachPhotoListeners(newPhotoId);
+            });
+
+            attachPhotoListeners(1);
+
+            // Observation Functionality
+            let observationCounter = 1;
+            const observationContainers = document.getElementById('observationContainers');
+            const addObservationBtn = document.getElementById('addObservationBtn');
+
+            const attachObservationListeners = (id) => {
+                const removeBtn = document.querySelector(`#observationContainer-${id} .remove-observation-btn`);
+                if (removeBtn) {
+                    removeBtn.addEventListener('click', () => {
+                        const container = document.getElementById(`observationContainer-${id}`);
+                        if (container && observationContainers.children.length > 1) {
+                            container.remove();
+                        }
+                    });
+                }
+            };
+
+            addObservationBtn.addEventListener('click', () => {
+                observationCounter++;
+                const newObsId = observationCounter;
+
+                const newObsContainer = document.createElement('div');
+                newObsContainer.classList.add('observation-container');
+                newObsContainer.id = `observationContainer-${newObsId}`;
+                newObsContainer.innerHTML = `
+                    <div class="form-group">
+                        <label for="observation-${newObsId}">Observation ${newObsId}:</label>
+                        <textarea id="observation-${newObsId}" name="observation-${newObsId}" placeholder="Enter your observation"></textarea>
+                    </div>
+                    <div class="button-group justify-end">
+                        <button type="button" class="remove-observation-btn remove-btn">Remove Observation</button>
+                    </div>
+                `;
+                observationContainers.appendChild(newObsContainer);
+                attachObservationListeners(newObsId);
+            });
+
+            attachObservationListeners(1);
+
+            // Signature Pad Functionality
+            const signaturePadCanvas = document.getElementById('signaturePad');
+            const signaturePadCtx = signaturePadCanvas.getContext('2d');
+            const clearSignatureBtn = document.getElementById('clearSignatureBtn');
+            const signatureDataInput = document.getElementById('signatureData');
+            const signaturePreview = document.getElementById('signaturePreview');
+
+            const resizeCanvas = () => {
+                const ratio = Math.max(window.devicePixelRatio || 1, 1);
+                signaturePadCanvas.width = signaturePadCanvas.offsetWidth * ratio;
+                signaturePadCanvas.height = signaturePadCanvas.offsetHeight * ratio;
+                signaturePadCanvas.getContext('2d').scale(ratio, ratio);
+            };
+
+            window.addEventListener('resize', resizeCanvas);
+            resizeCanvas();
+
+            let drawing = false;
+            let lastX = 0;
+            let lastY = 0;
+
+            const startDrawing = (e) => {
+                drawing = true;
+                [lastX, lastY] = getMousePos(signaturePadCanvas, e);
+            };
+
+            const draw = (e) => {
+                if (!drawing) return;
+                e.preventDefault();
+                const [x, y] = getMousePos(signaturePadCanvas, e);
+
+                signaturePadCtx.beginPath();
+                signaturePadCtx.moveTo(lastX, lastY);
+                signaturePadCtx.lineTo(x, y);
+                signaturePadCtx.strokeStyle = '#000';
+                signaturePadCtx.lineWidth = 2;
+                signaturePadCtx.lineCap = 'round';
+                signaturePadCtx.lineJoin = 'round';
+                signaturePadCtx.stroke();
+
+                [lastX, lastY] = [x, y];
+            };
+
+            const stopDrawing = () => {
+                drawing = false;
+            };
+
+            const getMousePos = (canvas, evt) => {
+                const rect = canvas.getBoundingClientRect();
+                if (evt.touches && evt.touches.length > 0) {
+                    return [
+                        evt.touches[0].clientX - rect.left,
+                        evt.touches[0].clientY - rect.top
+                    ];
+                }
+                return [
+                    evt.clientX - rect.left,
+                    evt.clientY - rect.top
+                ];
+            };
+
+            signaturePadCanvas.addEventListener('mousedown', startDrawing);
+            signaturePadCanvas.addEventListener('mousemove', draw);
+            signaturePadCanvas.addEventListener('mouseup', stopDrawing);
+            signaturePadCanvas.addEventListener('mouseout', stopDrawing);
+
+            signaturePadCanvas.addEventListener('touchstart', startDrawing, { passive: false });
+            signaturePadCanvas.addEventListener('touchmove', draw, { passive: false });
+            signaturePadCanvas.addEventListener('touchend', stopDrawing);
+            signaturePadCanvas.addEventListener('touchcancel', stopDrawing);
+
+            const isCanvasEmpty = (canvas) => {
+                const blank = document.createElement('canvas');
+                blank.width = canvas.width;
+                blank.height = canvas.height;
+                return canvas.toDataURL() === blank.toDataURL();
+            };
+
+            clearSignatureBtn.addEventListener('click', () => {
+                signaturePadCtx.clearRect(0, 0, signaturePadCanvas.width, signaturePadCanvas.height);
+                signatureDataInput.value = '';
+                signaturePreview.src = '';
+                signaturePreview.classList.add('hidden');
+            });
+
+            // SUBMIT (Google Drive Storage via Apps Script)
+            hseReportForm.addEventListener('submit', async (event) => {
+                event.preventDefault(); // Prevent default form submission
+
+                // Ensure signature data is captured if the canvas is not empty
+                if (!signatureDataInput.value && !isCanvasEmpty(signaturePadCanvas)) {
+                    const dataURL = signaturePadCanvas.toDataURL("image/png");
+                    signatureDataInput.value = dataURL;
+                    signaturePreview.src = dataURL;
+                    signaturePreview.classList.remove('hidden');
+                }
+
+                const formData = new FormData(hseReportForm);
+
+                // Build structured payload (Drive record)
+                const payload = {
+                    reportDate: formData.get('reportDate') || new Date().toISOString().slice(0, 10),
+                    siteLocation: formData.get('siteLocation') || '',
+                    inspectorName: formData.get('inspectorName') || '',
+                    signatureData: formData.get('signatureData') || '',
+                    checklist: {},
+                    observations: [],
+                    photos: [],
+                    submittedAt: new Date().toISOString(),
+                    userAgent: navigator.userAgent
+                };
+
+                // Checklist & comments
+                for (const [key, value] of formData.entries()) {
+                    if (key.startsWith('checklist-') && !key.endsWith('-comments')) {
+                        payload.checklist[key] = {
+                            result: value,
+                            comments: formData.get(`${key}-comments`) || ''
+                        };
+                    }
+                }
+
+                // Observations (dynamic)
+                for (const [key, value] of formData.entries()) {
+                    if (key.startsWith('observation-') && value && String(value).trim().length > 0) {
+                        payload.observations.push(String(value).trim());
+                    }
+                }
+
+                // Photos: convert to Base64 and include caption
+                const photoUploads = [];
+                for (const [key, value] of formData.entries()) {
+                    if (key.startsWith('photoUpload-') && value instanceof File && value.size > 0) {
+                        const id = key.split('-')[1]; // photoUpload-<id>
+                        photoUploads.push({ id, file: value });
+                    }
+                }
+
+                for (const p of photoUploads) {
+                    try {
+                        const dataUrl = await fileToDataUrl(p.file);
+                        const caption = formData.get(`photoCaption-${p.id}`) || '';
+                        payload.photos.push({ dataUrl, caption });
+                    } catch (err) {
+                        console.warn('Failed to read photo:', p, err);
+                    }
+                }
+
+                // Optional: store a simple HTML snapshot for traceability (can be replaced later with a formatted report template)
+                payload.renderedHtml = document.documentElement.outerHTML;
+
+                // Post to Google Apps Script Web App (Drive storage)
+                const postJson = async (useNoCors = false) => {
+                    const options = {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    };
+                    if (useNoCors) options.mode = 'no-cors';
+                    return fetch(ENDPOINT_URL, options);
+                };
+
+                try {
+                    const res = await postJson(false);
+
+                    // If the response is readable, parse it
+                    let result = null;
+                    try {
+                        result = await res.json();
+                    } catch (_) {
+                        // Some deployments / browsers may block reading the response; handle gracefully
+                    }
+
+                    if (result && result.ok) {
+                        alert(`HSE Report saved in Google Drive.\nFolder: ${result.folderName}`);
+                        hseReportForm.reset();
+                        reportDateInput.valueAsDate = new Date();
+                        signaturePreview.src = "";
+                        signaturePreview.classList.add('hidden');
+                        clearSignatureBtn.click();
+                    } else if (result && result.ok === false) {
+                        alert(`Save failed: ${result.message || 'Unknown error'}`);
+                    } else {
+                        // If we cannot read JSON due to CORS/opaque response, still show a safe message
+                        alert('HSE Report submitted. If you do not see a confirmation folder in Drive, enable Web App access or contact admin.');
+                    }
+
+                } catch (err) {
+                    // Likely CORS/network error. Attempt no-cors fallback.
+                    console.warn('Primary POST failed, trying no-cors fallback:', err);
+                    try {
+                        await postJson(true);
+                        alert('HSE Report submitted. (No-CORS mode) Please verify the report folder in Google Drive.');
+                        hseReportForm.reset();
+                        reportDateInput.valueAsDate = new Date();
+                        signaturePreview.src = "";
+                        signaturePreview.classList.add('hidden');
+                        clearSignatureBtn.click();
+                    } catch (err2) {
+                        console.error('No-CORS fallback failed:', err2);
+                        alert('Submission failed. Please check internet connection, Web App access settings, and endpoint URL.');
+                    }
+                }
+            });
+        });
+    </script>
+</body>
+</html>
